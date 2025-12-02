@@ -40,14 +40,14 @@ export async function POST(req: Request) {
         if (session.mode === 'subscription' && session.subscription) {
           const subscription = await stripe.subscriptions.retrieve(
             session.subscription as string
-          ) as Stripe.Subscription;
+          );
 
           await prisma.user.update({
             where: { stripeCustomerId: session.customer as string },
             data: {
               stripeSubscriptionId: subscription.id,
               stripePriceId: subscription.items.data[0].price.id,
-              stripeCurrentPeriodEnd: new Date(subscription.current_period_end * 1000),
+              stripeCurrentPeriodEnd: new Date((subscription as any).current_period_end * 1000),
             },
           });
         }
@@ -60,13 +60,13 @@ export async function POST(req: Request) {
         if (invoice.subscription) {
           const subscription = await stripe.subscriptions.retrieve(
             invoice.subscription as string
-          ) as Stripe.Subscription;
+          );
 
           await prisma.user.update({
             where: { stripeSubscriptionId: subscription.id },
             data: {
               stripePriceId: subscription.items.data[0].price.id,
-              stripeCurrentPeriodEnd: new Date(subscription.current_period_end * 1000),
+              stripeCurrentPeriodEnd: new Date((subscription as any).current_period_end * 1000),
             },
           });
         }
@@ -94,7 +94,7 @@ export async function POST(req: Request) {
           where: { stripeSubscriptionId: subscription.id },
           data: {
             stripePriceId: subscription.items.data[0].price.id,
-            stripeCurrentPeriodEnd: new Date(subscription.current_period_end * 1000),
+            stripeCurrentPeriodEnd: new Date((subscription as any).current_period_end * 1000),
           },
         });
         break;
