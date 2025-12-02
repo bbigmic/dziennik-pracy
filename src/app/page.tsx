@@ -1,65 +1,244 @@
-import Image from "next/image";
+'use client';
+
+import { useState, useEffect } from 'react';
+import { useSession, signOut } from 'next-auth/react';
+import { format } from 'date-fns';
+import { Briefcase, Mic, LogOut, Crown, User, Clock } from 'lucide-react';
+import Calendar from '@/components/Calendar';
+import DayModal from '@/components/DayModal';
+import AssignedTasks from '@/components/AssignedTasks';
+import { useTasks } from '@/hooks/useTasks';
+import { useAssignedTasksApi } from '@/hooks/useAssignedTasksApi';
+import Link from 'next/link';
 
 export default function Home() {
+  const { data: session, status } = useSession();
+  const { data, isLoaded, addTask, removeTask, updateTask } = useTasks();
+  const {
+    tasks: assignedTasks,
+    isLoaded: assignedTasksLoaded,
+    addTask: addAssignedTask,
+    removeTask: removeAssignedTask,
+    updateTask: updateAssignedTask,
+  } = useAssignedTasksApi();
+  const [selectedDate, setSelectedDate] = useState<Date | null>(null);
+  const [subscriptionStatus, setSubscriptionStatus] = useState<{
+    isActive: boolean;
+    isTrialing: boolean;
+    trialEndsAt: string | null;
+  } | null>(null);
+
+  useEffect(() => {
+    if (session?.user?.id) {
+      fetchSubscriptionStatus();
+    }
+  }, [session]);
+
+  const fetchSubscriptionStatus = async () => {
+    try {
+      const res = await fetch('/api/subscription/status');
+      if (res.ok) {
+        const data = await res.json();
+        setSubscriptionStatus(data);
+      }
+    } catch (error) {
+      console.error('Error fetching subscription:', error);
+    }
+  };
+
+  const handleDayClick = (date: Date) => {
+    setSelectedDate(date);
+  };
+
+  const handleCloseModal = () => {
+    setSelectedDate(null);
+  };
+
+  const handleAddTask = async (text: string) => {
+    if (selectedDate) {
+      const dateKey = format(selectedDate, 'yyyy-MM-dd');
+      try {
+        await addTask(dateKey, text);
+      } catch {
+        // Error is handled in the hook
+      }
+    }
+  };
+
+  const handleRemoveTask = async (taskId: string) => {
+    if (selectedDate) {
+      const dateKey = format(selectedDate, 'yyyy-MM-dd');
+      try {
+        await removeTask(dateKey, taskId);
+      } catch {
+        // Error is handled in the hook
+      }
+    }
+  };
+
+  const handleUpdateTask = async (taskId: string, newText: string) => {
+    if (selectedDate) {
+      const dateKey = format(selectedDate, 'yyyy-MM-dd');
+      try {
+        await updateTask(dateKey, taskId, newText);
+      } catch {
+        // Error is handled in the hook
+      }
+    }
+  };
+
+  const handleMarkAsDone = async (taskId: string, taskTitle: string) => {
+    const todayKey = format(new Date(), 'yyyy-MM-dd');
+    try {
+      await addTask(todayKey, `✅ ${taskTitle}`);
+      await removeAssignedTask(taskId);
+    } catch {
+      // Error is handled in the hook
+    }
+  };
+
+  const handleAddAssignedTask = async (task: Parameters<typeof addAssignedTask>[0]) => {
+    try {
+      await addAssignedTask(task);
+    } catch {
+      // Error is handled in the hook
+    }
+  };
+
+  const handleRemoveAssignedTask = async (taskId: string) => {
+    try {
+      await removeAssignedTask(taskId);
+    } catch {
+      // Error is handled in the hook
+    }
+  };
+
+  const handleUpdateAssignedTask = async (taskId: string, updates: Parameters<typeof updateAssignedTask>[1]) => {
+    try {
+      await updateAssignedTask(taskId, updates);
+    } catch {
+      // Error is handled in the hook
+    }
+  };
+
+  if (status === 'loading' || !isLoaded || !assignedTasksLoaded) {
+    return (
+      <div className="min-h-screen bg-pattern flex items-center justify-center">
+        <div className="w-12 h-12 border-4 border-[var(--accent-primary)] border-t-transparent rounded-full animate-spin" />
+      </div>
+    );
+  }
+
+  const daysUntilTrialEnds = subscriptionStatus?.trialEndsAt
+    ? Math.ceil(
+        (new Date(subscriptionStatus.trialEndsAt).getTime() - Date.now()) /
+          (1000 * 60 * 60 * 24)
+      )
+    : null;
+
   return (
-    <div className="flex min-h-screen items-center justify-center bg-zinc-50 font-sans dark:bg-black">
-      <main className="flex min-h-screen w-full max-w-3xl flex-col items-center justify-between py-32 px-16 bg-white dark:bg-black sm:items-start">
-        <Image
-          className="dark:invert"
-          src="/next.svg"
-          alt="Next.js logo"
-          width={100}
-          height={20}
-          priority
-        />
-        <div className="flex flex-col items-center gap-6 text-center sm:items-start sm:text-left">
-          <h1 className="max-w-xs text-3xl font-semibold leading-10 tracking-tight text-black dark:text-zinc-50">
-            To get started, edit the page.tsx file.
-          </h1>
-          <p className="max-w-md text-lg leading-8 text-zinc-600 dark:text-zinc-400">
-            Looking for a starting point or more instructions? Head over to{" "}
-            <a
-              href="https://vercel.com/templates?framework=next.js&utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-              className="font-medium text-zinc-950 dark:text-zinc-50"
+    <main className="min-h-screen bg-pattern safe-bottom">
+      <div className="container mx-auto px-3 sm:px-4 py-4 sm:py-8">
+        {/* User Menu */}
+        <div className="flex justify-end gap-2 mb-4">
+          {subscriptionStatus?.isTrialing && daysUntilTrialEnds !== null && (
+            <Link
+              href="/subscription"
+              className="flex items-center gap-2 px-3 py-2 rounded-lg bg-amber-500/20 border border-amber-500/30 text-amber-300 text-sm hover:bg-amber-500/30 transition-colors"
             >
-              Templates
-            </a>{" "}
-            or the{" "}
-            <a
-              href="https://nextjs.org/learn?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-              className="font-medium text-zinc-950 dark:text-zinc-50"
-            >
-              Learning
-            </a>{" "}
-            center.
+              <Clock className="w-4 h-4" />
+              <span className="hidden sm:inline">Trial: </span>
+              {daysUntilTrialEnds} dni
+            </Link>
+          )}
+          <Link
+            href="/subscription"
+            className="flex items-center gap-2 px-3 py-2 rounded-lg bg-[var(--bg-secondary)] border border-[var(--border-color)] hover:border-[var(--accent-primary)] text-sm transition-colors"
+          >
+            <Crown className="w-4 h-4 text-amber-400" />
+            <span className="hidden sm:inline">Subskrypcja</span>
+          </Link>
+          <div className="flex items-center gap-2 px-3 py-2 rounded-lg bg-[var(--bg-secondary)] border border-[var(--border-color)] text-sm">
+            <User className="w-4 h-4 text-[var(--text-muted)]" />
+            <span className="hidden sm:inline text-[var(--text-muted)]">
+              {session?.user?.name || session?.user?.email}
+            </span>
+          </div>
+          <button
+            onClick={() => signOut({ callbackUrl: '/login' })}
+            className="flex items-center gap-2 px-3 py-2 rounded-lg bg-[var(--bg-secondary)] border border-[var(--border-color)] hover:border-red-500/50 hover:bg-red-500/10 text-sm transition-colors"
+          >
+            <LogOut className="w-4 h-4" />
+            <span className="hidden sm:inline">Wyloguj</span>
+          </button>
+        </div>
+
+        {/* Header */}
+        <header className="text-center mb-6 sm:mb-12">
+          <div className="inline-flex items-center justify-center gap-2 sm:gap-3 mb-3 sm:mb-4">
+            <div className="p-2 sm:p-3 rounded-xl sm:rounded-2xl bg-gradient-to-br from-[var(--accent-primary)] to-[var(--accent-secondary)]">
+              <Briefcase className="w-6 h-6 sm:w-8 sm:h-8" />
+            </div>
+            <h1 className="text-2xl sm:text-4xl md:text-5xl font-bold tracking-tight">
+              Dziennik Pracy
+            </h1>
+          </div>
+          <p className="text-[var(--text-muted)] text-sm sm:text-lg max-w-md mx-auto px-4">
+            Rejestruj swoje czynności w pracy za pomocą głosu.
+            <br />
+            <span className="inline-flex items-center gap-1 mt-1 sm:mt-2">
+              <Mic className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
+              Nagraj, a AI zapisze za Ciebie.
+            </span>
           </p>
+        </header>
+
+        {/* Calendar */}
+        <Calendar data={data} onDayClick={handleDayClick} />
+
+        {/* Stats */}
+        <div className="mt-6 sm:mt-12 flex justify-center px-2">
+          <div className="glass rounded-xl sm:rounded-2xl p-4 sm:p-6 inline-flex gap-4 sm:gap-8">
+            <div className="text-center">
+              <p className="text-2xl sm:text-3xl font-bold text-[var(--accent-secondary)]">
+                {Object.keys(data).length}
+              </p>
+              <p className="text-xs sm:text-sm text-[var(--text-muted)]">Dni z wpisami</p>
+            </div>
+            <div className="w-px bg-[var(--border-color)]" />
+            <div className="text-center">
+              <p className="text-2xl sm:text-3xl font-bold text-[var(--accent-secondary)]">
+                {Object.values(data).reduce(
+                  (acc, day) => acc + day.tasks.length,
+                  0
+                )}
+              </p>
+              <p className="text-xs sm:text-sm text-[var(--text-muted)]">Łącznie wpisów</p>
+            </div>
+          </div>
         </div>
-        <div className="flex flex-col gap-4 text-base font-medium sm:flex-row">
-          <a
-            className="flex h-12 w-full items-center justify-center gap-2 rounded-full bg-foreground px-5 text-background transition-colors hover:bg-[#383838] dark:hover:bg-[#ccc] md:w-[158px]"
-            href="https://vercel.com/new?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            <Image
-              className="dark:invert"
-              src="/vercel.svg"
-              alt="Vercel logomark"
-              width={16}
-              height={16}
-            />
-            Deploy Now
-          </a>
-          <a
-            className="flex h-12 w-full items-center justify-center rounded-full border border-solid border-black/[.08] px-5 transition-colors hover:border-transparent hover:bg-black/[.04] dark:border-white/[.145] dark:hover:bg-[#1a1a1a] md:w-[158px]"
-            href="https://nextjs.org/docs?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            Documentation
-          </a>
-        </div>
-      </main>
-    </div>
+
+        {/* Assigned Tasks */}
+        <AssignedTasks
+          tasks={assignedTasks}
+          onAddTask={handleAddAssignedTask}
+          onRemoveTask={handleRemoveAssignedTask}
+          onUpdateTask={handleUpdateAssignedTask}
+          onMarkAsDone={handleMarkAsDone}
+        />
+      </div>
+
+      {/* Day Modal */}
+      {selectedDate && (
+        <DayModal
+          date={selectedDate}
+          dayEntry={data[format(selectedDate, 'yyyy-MM-dd')]}
+          onClose={handleCloseModal}
+          onAddTask={handleAddTask}
+          onRemoveTask={handleRemoveTask}
+          onUpdateTask={handleUpdateTask}
+        />
+      )}
+    </main>
   );
 }

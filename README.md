@@ -1,36 +1,78 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# 📋 Dziennik Pracy
 
-## Getting Started
+Aplikacja do rejestrowania wykonanych czynności w pracy za pomocą nagrań głosowych i AI.
 
-First, run the development server:
+## ✨ Funkcje
+
+- 📅 **Kalendarz miesięczny** - przeglądaj i dodawaj wpisy dla każdego dnia
+- 🎤 **Nagrywanie głosowe** - nagraj co zrobiłeś, a AI przetworzy i zapisze
+- 🤖 **Przetwarzanie AI** - transkrypcja przez Whisper + formatowanie przez GPT-4
+- 📝 **Edycja wpisów** - możliwość ręcznego dodawania i edycji
+- 💾 **Lokalne przechowywanie** - dane zapisywane w localStorage
+
+## 🚀 Uruchomienie
+
+### 1. Zainstaluj zależności
+
+```bash
+npm install
+```
+
+### 2. Skonfiguruj klucz API OpenAI
+
+Edytuj plik `.env.local` i dodaj swój klucz API:
+
+```env
+OPENAI_API_KEY=sk-your-api-key-here
+```
+
+### 3. Uruchom aplikację
 
 ```bash
 npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+Otwórz [http://localhost:3000](http://localhost:3000) w przeglądarce.
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+## 🛠️ Technologie
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+- **Next.js 15** - framework React z App Router
+- **TypeScript** - typowanie statyczne
+- **Tailwind CSS** - stylowanie
+- **OpenAI API** - transkrypcja (Whisper) i przetwarzanie (GPT-4o-mini)
+- **date-fns** - obsługa dat
+- **Lucide React** - ikony
 
-## Learn More
+## 📱 Jak używać
 
-To learn more about Next.js, take a look at the following resources:
+1. **Kliknij na dzień** w kalendarzu
+2. **Naciśnij przycisk mikrofonu** i opowiedz co zrobiłeś
+3. **Zatrzymaj nagrywanie** - AI przetworzy nagranie i doda wpis
+4. **Możesz też dodać wpis ręcznie** klikając "Dodaj ręcznie"
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
+## 📁 Struktura projektu
 
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
+```
+src/
+├── app/
+│   ├── api/
+│   │   ├── transcribe/   # API transkrypcji Whisper
+│   │   └── process/      # API przetwarzania GPT
+│   ├── globals.css
+│   ├── layout.tsx
+│   └── page.tsx
+├── components/
+│   ├── AudioRecorder.tsx # Komponent nagrywania
+│   ├── Calendar.tsx      # Kalendarz miesięczny
+│   ├── DayModal.tsx      # Modal dnia
+│   └── TaskList.tsx      # Lista zadań
+├── hooks/
+│   └── useLocalStorage.ts # Hook do localStorage
+└── types/
+    └── index.ts          # Definicje typów
+```
 
-## Deploy on Vercel
+## 🔒 Prywatność
 
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
-
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+Wszystkie dane są przechowywane lokalnie w przeglądarce (localStorage). 
+Nagrania audio są przesyłane tylko do API OpenAI w celu transkrypcji.
