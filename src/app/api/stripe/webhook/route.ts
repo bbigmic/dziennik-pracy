@@ -40,7 +40,7 @@ export async function POST(req: Request) {
         if (session.mode === 'subscription' && session.subscription) {
           const subscription = await stripe.subscriptions.retrieve(
             session.subscription as string
-          );
+          ) as Stripe.Subscription;
 
           await prisma.user.update({
             where: { stripeCustomerId: session.customer as string },
@@ -60,7 +60,7 @@ export async function POST(req: Request) {
         if (invoice.subscription) {
           const subscription = await stripe.subscriptions.retrieve(
             invoice.subscription as string
-          );
+          ) as Stripe.Subscription;
 
           await prisma.user.update({
             where: { stripeSubscriptionId: subscription.id },
