@@ -10,6 +10,7 @@ import AssignedTasks from '@/components/AssignedTasks';
 import { useTasks } from '@/hooks/useTasks';
 import { useAssignedTasksApi } from '@/hooks/useAssignedTasksApi';
 import Link from 'next/link';
+import Image from 'next/image';
 
 export default function Home() {
   const { data: session, status } = useSession();
@@ -176,8 +177,13 @@ export default function Home() {
         {/* Header */}
         <header className="text-center mb-6 sm:mb-12">
           <div className="inline-flex items-center justify-center gap-2 sm:gap-3 mb-3 sm:mb-4">
-            <div className="p-2 sm:p-3 rounded-xl sm:rounded-2xl bg-gradient-to-br from-[var(--accent-primary)] to-[var(--accent-secondary)]">
-              <Briefcase className="w-6 h-6 sm:w-8 sm:h-8" />
+            <div className="relative w-10 h-10 sm:w-14 sm:h-14 rounded-xl sm:rounded-2xl overflow-hidden">
+              <Image
+                src="/icon-source.png"
+                alt="Dziennik Pracy"
+                fill
+                className="object-cover"
+              />
             </div>
             <h1 className="text-2xl sm:text-4xl md:text-5xl font-bold tracking-tight">
               Dziennik Pracy

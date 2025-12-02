@@ -5,6 +5,7 @@ import { signIn } from 'next-auth/react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { Briefcase, Mail, Lock, User, UserPlus, Loader2, Eye, EyeOff, Gift, Check } from 'lucide-react';
+import Image from 'next/image';
 
 export default function RegisterPage() {
   const router = useRouter();
@@ -85,8 +86,13 @@ export default function RegisterPage() {
         {/* Logo */}
         <div className="text-center mb-8">
           <div className="inline-flex items-center justify-center gap-3 mb-4">
-            <div className="p-3 rounded-2xl bg-gradient-to-br from-[var(--accent-primary)] to-[var(--accent-secondary)]">
-              <Briefcase className="w-8 h-8" />
+            <div className="relative w-14 h-14 rounded-2xl overflow-hidden">
+              <Image
+                src="/icon-source.png"
+                alt="Dziennik Pracy"
+                fill
+                className="object-cover"
+              />
             </div>
             <h1 className="text-3xl font-bold tracking-tight">Dziennik Pracy</h1>
           </div>
