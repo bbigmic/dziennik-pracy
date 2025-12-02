@@ -147,10 +147,10 @@ export default function SubscriptionPage() {
         <div className="glass rounded-2xl p-8 border border-[var(--accent-primary)]/30 max-w-md mx-auto">
           <div className="text-center mb-6">
             <div className="text-5xl font-bold mb-2">
-              $7
-              <span className="text-lg font-normal text-[var(--text-muted)]">/miesiąc</span>
+              7,99 zł
+              <span className="text-lg font-normal text-[var(--text-muted)]">/tydzień</span>
             </div>
-            <p className="text-[var(--text-muted)]">Płatność miesięczna</p>
+            <p className="text-[var(--text-muted)]">Płatność tygodniowa</p>
           </div>
 
           <ul className="space-y-4 mb-8">
