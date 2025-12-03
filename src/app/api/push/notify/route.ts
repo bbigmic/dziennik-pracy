@@ -12,9 +12,15 @@ if (vapidPublicKey && vapidPrivateKey) {
   webpush.setVapidDetails(vapidSubject, vapidPublicKey, vapidPrivateKey);
 }
 
-// GET - endpoint do testowania (tylko w development)
+// GET - Vercel Cron używa GET, więc musimy to obsłużyć
 export async function GET(req: Request) {
-  if (process.env.NODE_ENV === 'production') {
+  // Sprawdź czy to wywołanie z Vercel Cron
+  const vercelCronHeader = req.headers.get('x-vercel-cron') || 
+                           req.headers.get('X-Vercel-Cron') ||
+                           req.headers.get('X-VERCEL-CRON');
+  
+  // W produkcji pozwól tylko z headerem Vercel Cron
+  if (process.env.NODE_ENV === 'production' && vercelCronHeader !== '1') {
     return NextResponse.json({ error: 'Not allowed' }, { status: 403 });
   }
   
