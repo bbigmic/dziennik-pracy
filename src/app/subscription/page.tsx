@@ -178,12 +178,6 @@ export default function SubscriptionPage() {
               </div>
               <span>Nieograniczona historia</span>
             </li>
-            <li className="flex items-center gap-3">
-              <div className="p-1 rounded-full bg-green-500/20">
-                <Check className="w-4 h-4 text-green-400" />
-              </div>
-              <span>Priorytetowe wsparcie</span>
-            </li>
           </ul>
 
           {subscriptionInfo?.subscriptionEndsAt ? (

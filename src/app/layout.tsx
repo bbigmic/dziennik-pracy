@@ -2,6 +2,7 @@ import type { Metadata, Viewport } from 'next';
 import { Outfit } from 'next/font/google';
 import './globals.css';
 import SessionProvider from '@/components/providers/SessionProvider';
+import PushNotificationSetup from '@/components/PushNotificationSetup';
 
 const outfit = Outfit({
   subsets: ['latin', 'latin-ext'],
@@ -49,7 +50,10 @@ export default function RootLayout({
   return (
     <html lang="pl">
       <body className={`${outfit.variable} font-sans antialiased`}>
-        <SessionProvider>{children}</SessionProvider>
+        <SessionProvider>
+          {children}
+          <PushNotificationSetup />
+        </SessionProvider>
       </body>
     </html>
   );

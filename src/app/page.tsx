@@ -8,6 +8,7 @@ import Calendar from '@/components/Calendar';
 import DayModal from '@/components/DayModal';
 import AssignedTasks from '@/components/AssignedTasks';
 import FloatingAssistant from '@/components/FloatingAssistant';
+import UserProfileModal from '@/components/UserProfileModal';
 import { useTasks } from '@/hooks/useTasks';
 import { useAssignedTasksApi } from '@/hooks/useAssignedTasksApi';
 import Link from 'next/link';
@@ -24,6 +25,7 @@ export default function Home() {
     updateTask: updateAssignedTask,
   } = useAssignedTasksApi();
   const [selectedDate, setSelectedDate] = useState<Date | null>(null);
+  const [showProfileModal, setShowProfileModal] = useState(false);
   const [subscriptionStatus, setSubscriptionStatus] = useState<{
     isActive: boolean;
     isTrialing: boolean;
@@ -169,12 +171,15 @@ export default function Home() {
             <Crown className="w-4 h-4 text-amber-400" />
             <span className="hidden sm:inline">Subskrypcja</span>
           </Link>
-          <div className="flex items-center gap-2 px-3 py-2 rounded-lg bg-[var(--bg-secondary)] border border-[var(--border-color)] text-sm">
+          <button
+            onClick={() => setShowProfileModal(true)}
+            className="flex items-center gap-2 px-3 py-2 rounded-lg bg-[var(--bg-secondary)] border border-[var(--border-color)] hover:border-[var(--accent-primary)] text-sm transition-colors"
+          >
             <User className="w-4 h-4 text-[var(--text-muted)]" />
             <span className="hidden sm:inline text-[var(--text-muted)]">
               {session?.user?.name || session?.user?.email}
             </span>
-          </div>
+          </button>
           <button
             onClick={() => signOut({ callbackUrl: '/login' })}
             className="flex items-center gap-2 px-3 py-2 rounded-lg bg-[var(--bg-secondary)] border border-[var(--border-color)] hover:border-red-500/50 hover:bg-red-500/10 text-sm transition-colors"
@@ -258,6 +263,11 @@ export default function Home() {
 
       {/* Floating Assistant */}
       <FloatingAssistant onAddTask={handleVoiceTask} />
+
+      {/* User Profile Modal */}
+      {showProfileModal && (
+        <UserProfileModal onClose={() => setShowProfileModal(false)} />
+      )}
     </main>
   );
 }

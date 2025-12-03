@@ -11,31 +11,32 @@ datasource db {
 }
 
 model User {
-  id            String    @id @default(cuid())
-  email         String    @unique
-  password      String
-  name          String?
-  createdAt     DateTime  @default(now())
-  updatedAt     DateTime  @updatedAt
-  
+  id        String   @id @default(cuid())
+  email     String   @unique
+  password  String
+  name      String?
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
   // Zgody użytkownika
-  termsAccepted       Boolean   @default(false)  // Regulamin i polityka prywatności
-  marketingAccepted   Boolean   @default(false)  // Zgoda marketingowa (opcjonalna)
-  consentsAcceptedAt  DateTime?                  // Data akceptacji zgód
-  
+  termsAccepted      Boolean   @default(false) // Regulamin i polityka prywatności
+  marketingAccepted  Boolean   @default(false) // Zgoda marketingowa (opcjonalna)
+  consentsAcceptedAt DateTime? // Data akceptacji zgód
+
   // Trial i subskrypcja
-  trialEndsAt   DateTime  // Data zakończenia 7-dniowego trialu
-  
+  trialEndsAt DateTime // Data zakończenia 7-dniowego trialu
+
   // Stripe
-  stripeCustomerId     String?   @unique
-  stripeSubscriptionId String?   @unique
-  stripePriceId        String?
+  stripeCustomerId       String?   @unique
+  stripeSubscriptionId   String?   @unique
+  stripePriceId          String?
   stripeCurrentPeriodEnd DateTime?
-  
+
   // Relacje
-  sessions      Session[]
-  tasks         Task[]
-  assignedTasks AssignedTask[]
+  sessions          Session[]
+  tasks             Task[]
+  assignedTasks     AssignedTask[]
+  pushSubscriptions PushSubscription[]
 }
 
 model Session {
@@ -44,20 +45,20 @@ model Session {
   userId       String
   expires      DateTime
   user         User     @relation(fields: [userId], references: [id], onDelete: Cascade)
-  
+
   @@index([userId])
 }
 
 model Task {
   id        String   @id @default(cuid())
   text      String
-  date      String   // format: YYYY-MM-DD
+  date      String // format: YYYY-MM-DD
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
-  
-  userId    String
-  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
-  
+
+  userId String
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+
   @@index([userId, date])
 }
 
@@ -68,13 +69,27 @@ model AssignedTask {
   category     String   @default("todo") // 'responsibility' | 'todo'
   priority     String   @default("medium") // 'low' | 'medium' | 'high'
   completed    Boolean  @default(false)
-  deadline     String?  // format: YYYY-MM-DD
-  deadlineTime String?  // format: HH:mm
+  deadline     String? // format: YYYY-MM-DD
+  deadlineTime String? // format: HH:mm
   createdAt    DateTime @default(now())
   updatedAt    DateTime @updatedAt
-  
-  userId       String
-  user         User     @relation(fields: [userId], references: [id], onDelete: Cascade)
-  
+
+  userId String
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+}
+
+model PushSubscription {
+  id        String   @id @default(cuid())
+  userId    String
+  endpoint  String   @unique
+  p256dh    String
+  auth      String
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
   @@index([userId])
 }
