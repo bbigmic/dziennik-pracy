@@ -26,18 +26,31 @@ export function usePushNotifications() {
   const checkSubscription = async () => {
     try {
       // Sprawdź czy service worker jest zarejestrowany
-      const registrations = await navigator.serviceWorker.getRegistrations();
+      let registrations = await navigator.serviceWorker.getRegistrations();
+      
+      // Jeśli service worker nie jest zarejestrowany, spróbuj go zarejestrować
       if (registrations.length === 0) {
-        // Service worker nie jest zarejestrowany - next-pwa może go jeszcze rejestrować
-        // Spróbuj ponownie z limitem prób
         if (retryCountRef.current < maxRetries) {
           retryCountRef.current++;
-          setTimeout(() => {
-            checkSubscription();
-          }, 1000);
-          return;
+          try {
+            console.log(`Attempting to register service worker (attempt ${retryCountRef.current}/${maxRetries})...`);
+            const registration = await navigator.serviceWorker.register('/sw.js', {
+              scope: '/',
+            });
+            console.log('Service worker registered successfully');
+            registrations = [registration];
+            retryCountRef.current = 0; // Reset po udanej rejestracji
+          } catch (regError) {
+            console.error('Failed to register service worker:', regError);
+            // Spróbuj ponownie po chwili
+            setTimeout(() => {
+              checkSubscription();
+            }, 1000);
+            return;
+          }
         } else {
           // Przekroczono limit prób - service worker prawdopodobnie nie jest dostępny
+          console.warn('Service worker registration failed after max retries');
           setSubscription(null);
           setIsSubscribed(false);
           setIsLoading(false);
@@ -103,9 +116,21 @@ export function usePushNotifications() {
 
       // Sprawdź czy service worker jest zarejestrowany
       console.log('Checking service worker registration...');
-      const registrations = await navigator.serviceWorker.getRegistrations();
+      let registrations = await navigator.serviceWorker.getRegistrations();
+      
+      // Jeśli service worker nie jest zarejestrowany, spróbuj go zarejestrować
       if (registrations.length === 0) {
-        throw new Error('Service worker nie jest zarejestrowany. Odśwież stronę i spróbuj ponownie.');
+        console.log('Service worker not registered, attempting to register...');
+        try {
+          const registration = await navigator.serviceWorker.register('/sw.js', {
+            scope: '/',
+          });
+          console.log('Service worker registered successfully');
+          registrations = [registration];
+        } catch (regError) {
+          console.error('Failed to register service worker:', regError);
+          throw new Error('Nie można zarejestrować service workera. Upewnij się, że aplikacja działa na HTTPS.');
+        }
       }
 
       // Zarejestruj service worker z timeoutem
