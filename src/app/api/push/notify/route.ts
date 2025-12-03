@@ -14,16 +14,47 @@ if (vapidPublicKey && vapidPrivateKey) {
 
 // GET - Vercel Cron używa GET, więc musimy to obsłużyć
 export async function GET(req: Request) {
+  console.log('=== GET request to /api/push/notify ===');
+  
+  // Sprawdź wszystkie nagłówki
+  const allHeaders: Record<string, string> = {};
+  req.headers.forEach((value, key) => {
+    allHeaders[key] = value;
+  });
+  console.log('All headers:', JSON.stringify(allHeaders, null, 2));
+  
   // Sprawdź czy to wywołanie z Vercel Cron
   const vercelCronHeader = req.headers.get('x-vercel-cron') || 
                            req.headers.get('X-Vercel-Cron') ||
                            req.headers.get('X-VERCEL-CRON');
   
-  // W produkcji pozwól tylko z headerem Vercel Cron
-  if (process.env.NODE_ENV === 'production' && vercelCronHeader !== '1') {
-    return NextResponse.json({ error: 'Not allowed' }, { status: 403 });
+  const userAgent = req.headers.get('user-agent') || '';
+  const isVercelCron = userAgent.includes('vercel-cron');
+  
+  console.log('Vercel Cron check:', {
+    vercelCronHeader,
+    userAgent,
+    isVercelCron,
+    nodeEnv: process.env.NODE_ENV,
+  });
+  
+  // W produkcji pozwól jeśli to Vercel Cron (sprawdź user-agent lub header)
+  if (process.env.NODE_ENV === 'production') {
+    if (vercelCronHeader !== '1' && !isVercelCron) {
+      console.error('GET request blocked - not Vercel Cron');
+      return NextResponse.json({ 
+        error: 'Not allowed',
+        debug: {
+          hasVercelCronHeader: vercelCronHeader === '1',
+          vercelCronHeaderValue: vercelCronHeader,
+          userAgent,
+          isVercelCron,
+        }
+      }, { status: 403 });
+    }
   }
   
+  console.log('GET request allowed, calling POST logic');
   // Wywołaj POST logic
   return POST(req);
 }
