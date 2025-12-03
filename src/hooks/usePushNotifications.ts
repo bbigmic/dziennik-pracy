@@ -56,7 +56,7 @@ export function usePushNotifications() {
       // Utwórz subskrypcję
       const sub = await registration.pushManager.subscribe({
         userVisibleOnly: true,
-        applicationServerKey: applicationServerKey,
+        applicationServerKey: applicationServerKey as BufferSource,
       });
 
       // Wyślij subskrypcję do serwera
