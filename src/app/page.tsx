@@ -7,6 +7,7 @@ import { Briefcase, Mic, LogOut, Crown, User, Clock } from 'lucide-react';
 import Calendar from '@/components/Calendar';
 import DayModal from '@/components/DayModal';
 import AssignedTasks from '@/components/AssignedTasks';
+import FloatingAssistant from '@/components/FloatingAssistant';
 import { useTasks } from '@/hooks/useTasks';
 import { useAssignedTasksApi } from '@/hooks/useAssignedTasksApi';
 import Link from 'next/link';
@@ -122,6 +123,15 @@ export default function Home() {
     }
   };
 
+  const handleVoiceTask = async (task: {
+    title: string;
+    description?: string;
+    category: 'todo';
+    priority: 'low' | 'medium' | 'high';
+  }) => {
+    await handleAddAssignedTask(task);
+  };
+
   if (status === 'loading' || !isLoaded || !assignedTasksLoaded) {
     return (
       <div className="min-h-screen bg-pattern flex items-center justify-center">
@@ -139,7 +149,7 @@ export default function Home() {
 
   return (
     <main className="min-h-screen bg-pattern safe-bottom">
-      <div className="container mx-auto px-3 sm:px-4 py-4 sm:py-8">
+      <div className="container mx-auto px-3 sm:px-4 py-4 sm:py-8 mb-20">
         {/* User Menu */}
         <div className="flex justify-end gap-2 mb-4">
           {subscriptionStatus?.isTrialing && daysUntilTrialEnds !== null && (
@@ -245,6 +255,9 @@ export default function Home() {
           onUpdateTask={handleUpdateTask}
         />
       )}
+
+      {/* Floating Assistant */}
+      <FloatingAssistant onAddTask={handleVoiceTask} />
     </main>
   );
 }
