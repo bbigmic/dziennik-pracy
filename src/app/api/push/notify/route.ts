@@ -64,22 +64,33 @@ export async function POST(req: Request) {
   console.log('Timestamp:', new Date().toISOString());
   
   try {
-    // Sprawdź czy to wywołanie z Vercel Cron (header x-vercel-cron)
+    // Sprawdź czy to wywołanie z Vercel Cron (header x-vercel-cron lub user-agent)
     // lub z zewnętrznego cron (Authorization header)
-    const vercelCronHeader = req.headers.get('x-vercel-cron');
+    const vercelCronHeader = req.headers.get('x-vercel-cron') || 
+                             req.headers.get('X-Vercel-Cron') ||
+                             req.headers.get('X-VERCEL-CRON');
     const authHeader = req.headers.get('authorization');
     const cronSecret = process.env.CRON_SECRET;
+    const userAgent = req.headers.get('user-agent') || '';
+    const isVercelCronUserAgent = userAgent.includes('vercel-cron');
     
     console.log('Headers:', {
       'x-vercel-cron': vercelCronHeader,
       'authorization': authHeader ? 'present' : 'missing',
+      'user-agent': userAgent,
     });
     
     // Vercel automatycznie dodaje header x-vercel-cron do żądań z cron job
-    const isVercelCron = vercelCronHeader === '1';
+    // Albo używa user-agent: vercel-cron/1.0
+    const isVercelCron = vercelCronHeader === '1' || isVercelCronUserAgent;
     const isAuthorized = cronSecret && authHeader === `Bearer ${cronSecret}`;
     
-    console.log('Auth check:', { isVercelCron, isAuthorized });
+    console.log('Auth check:', { 
+      isVercelCron, 
+      isAuthorized,
+      hasVercelCronHeader: vercelCronHeader === '1',
+      hasVercelCronUserAgent: isVercelCronUserAgent,
+    });
     
     if (!isVercelCron && !isAuthorized) {
       console.error('Unauthorized request');
