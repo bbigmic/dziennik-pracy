@@ -8,6 +8,7 @@ export function usePushNotifications() {
   const [subscription, setSubscription] = useState<PushSubscription | null>(null);
   const [isSubscribed, setIsSubscribed] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
   const retryCountRef = useRef(0);
   const maxRetries = 3;
 
@@ -70,32 +71,63 @@ export function usePushNotifications() {
     }
   };
 
-  const subscribe = useCallback(async () => {
+  const subscribe = useCallback(async (): Promise<{ success: boolean; error: string | null }> => {
     if (!isSupported || !session?.user?.id) {
-      return false;
+      const errorMsg = 'Push notifications not supported or user not logged in';
+      console.error(errorMsg);
+      setError(errorMsg);
+      return { success: false, error: errorMsg };
     }
 
     try {
       setIsLoading(true);
+      console.log('Starting subscription process...');
 
       // Pobierz VAPID public key
+      console.log('Fetching VAPID public key...');
       const vapidResponse = await fetch('/api/push/vapid-public-key');
       if (!vapidResponse.ok) {
-        throw new Error('Nie można pobrać klucza VAPID');
+        const errorText = await vapidResponse.text();
+        console.error('VAPID key fetch failed:', errorText);
+        throw new Error('Nie można pobrać klucza VAPID. Sprawdź czy VAPID keys są skonfigurowane.');
       }
       const { publicKey } = await vapidResponse.json();
+      console.log('VAPID key received');
+
+      if (!publicKey) {
+        throw new Error('VAPID public key is missing');
+      }
 
       // Konwertuj klucz do formatu Uint8Array
       const applicationServerKey = urlBase64ToUint8Array(publicKey);
 
-      // Zarejestruj service worker
-      const registration = await navigator.serviceWorker.ready;
+      // Sprawdź czy service worker jest zarejestrowany
+      console.log('Checking service worker registration...');
+      const registrations = await navigator.serviceWorker.getRegistrations();
+      if (registrations.length === 0) {
+        throw new Error('Service worker nie jest zarejestrowany. Odśwież stronę i spróbuj ponownie.');
+      }
+
+      // Zarejestruj service worker z timeoutem
+      console.log('Waiting for service worker to be ready...');
+      const timeout = new Promise<never>((_, reject) => 
+        setTimeout(() => reject(new Error('Service worker timeout - spróbuj odświeżyć stronę')), 10000)
+      );
+
+      const registration = await Promise.race([
+        navigator.serviceWorker.ready,
+        timeout
+      ]) as ServiceWorkerRegistration;
+
+      console.log('Service worker ready, creating subscription...');
 
       // Utwórz subskrypcję
       const sub = await registration.pushManager.subscribe({
         userVisibleOnly: true,
         applicationServerKey: applicationServerKey as BufferSource,
       });
+
+      console.log('Subscription created, sending to server...');
 
       // Wyślij subskrypcję do serwera
       const response = await fetch('/api/push/subscribe', {
@@ -105,45 +137,67 @@ export function usePushNotifications() {
       });
 
       if (!response.ok) {
-        throw new Error('Nie można zapisać subskrypcji');
+        const errorData = await response.json().catch(() => ({ error: 'Unknown error' }));
+        console.error('Server error:', errorData);
+        throw new Error(errorData.error || 'Nie można zapisać subskrypcji');
       }
 
+      console.log('Subscription saved successfully');
       setSubscription(sub);
       setIsSubscribed(true);
-      return true;
+      setError(null);
+      return { success: true, error: null };
     } catch (error: any) {
       console.error('Error subscribing:', error);
+      
+      let errorMessage = 'Wystąpił błąd podczas włączania powiadomień';
+      
       if (error.name === 'NotAllowedError') {
-        alert('Powiadomienia zostały zablokowane. Sprawdź ustawienia przeglądarki.');
+        errorMessage = 'Powiadomienia zostały zablokowane. Sprawdź ustawienia przeglądarki.';
+      } else if (error.name === 'NotSupportedError') {
+        errorMessage = 'Twoja przeglądarka nie obsługuje powiadomień push.';
+      } else if (error.message) {
+        errorMessage = error.message;
       }
-      return false;
+      
+      setError(errorMessage);
+      return { success: false, error: errorMessage };
     } finally {
       setIsLoading(false);
     }
   }, [isSupported, session]);
 
-  const unsubscribe = useCallback(async () => {
-    if (!subscription) return false;
+  const unsubscribe = useCallback(async (): Promise<{ success: boolean; error: string | null }> => {
+    if (!subscription) {
+      return { success: false, error: 'Brak aktywnej subskrypcji' };
+    }
 
     try {
       setIsLoading(true);
+      setError(null);
 
       // Anuluj subskrypcję w przeglądarce
       await subscription.unsubscribe();
 
       // Usuń z serwera
-      await fetch('/api/push/unsubscribe', {
+      const response = await fetch('/api/push/unsubscribe', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ endpoint: subscription.endpoint }),
       });
 
+      if (!response.ok) {
+        throw new Error('Nie można usunąć subskrypcji z serwera');
+      }
+
       setSubscription(null);
       setIsSubscribed(false);
-      return true;
-    } catch (error) {
+      return { success: true, error: null };
+    } catch (error: any) {
       console.error('Error unsubscribing:', error);
-      return false;
+      const errorMsg = error.message || 'Nie udało się wyłączyć powiadomień';
+      setError(errorMsg);
+      return { success: false, error: errorMsg };
     } finally {
       setIsLoading(false);
     }
@@ -155,6 +209,7 @@ export function usePushNotifications() {
     isLoading,
     subscribe,
     unsubscribe,
+    error,
   };
 }
 

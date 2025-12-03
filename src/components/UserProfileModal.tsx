@@ -296,14 +296,14 @@ export default function UserProfileModal({ onClose }: UserProfileModalProps) {
                   onClick={async () => {
                     setPushError('');
                     if (isSubscribed) {
-                      const success = await unsubscribe();
-                      if (!success) {
-                        setPushError('Nie udało się wyłączyć powiadomień');
+                      const result = await unsubscribe();
+                      if (!result.success && result.error) {
+                        setPushError(result.error);
                       }
                     } else {
-                      const success = await subscribe();
-                      if (!success) {
-                        setPushError('Nie udało się włączyć powiadomień');
+                      const result = await subscribe();
+                      if (!result.success && result.error) {
+                        setPushError(result.error);
                       }
                     }
                   }}
