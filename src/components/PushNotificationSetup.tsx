@@ -8,23 +8,34 @@ export default function PushNotificationSetup() {
       return;
     }
 
-    // Poczekaj aż service worker będzie gotowy i dodaj obsługę powiadomień
-    navigator.serviceWorker.ready.then((registration) => {
-      // Service worker jest już zarejestrowany przez next-pwa
-      // Dodajemy obsługę powiadomień push poprzez dodanie event listenerów w service workerze
+    // Sprawdź czy service worker jest gotowy i czy ma obsługę powiadomień push
+    navigator.serviceWorker.ready.then(async (registration) => {
+      console.log('[PushNotificationSetup] Service Worker ready');
       
-      // Pobierz aktywny service worker
+      // Spróbuj zaimportować custom-sw.js do service workera
       if (registration.active) {
-        // Event listenery dla powiadomień są już w custom-sw.js
-        // Tutaj tylko logujemy że service worker jest gotowy
-        console.log('Service Worker ready for push notifications');
+        try {
+          // Sprawdź czy custom-sw.js jest już załadowany
+          const response = await fetch('/custom-sw.js');
+          if (response.ok) {
+            const customCode = await response.text();
+            console.log('[PushNotificationSetup] Custom SW code loaded, length:', customCode.length);
+            
+            // Wyślij wiadomość do service workera aby załadował custom kod
+            registration.active.postMessage({
+              type: 'IMPORT_CUSTOM_SW',
+              url: '/custom-sw.js'
+            });
+          }
+        } catch (error) {
+          console.error('[PushNotificationSetup] Error loading custom-sw.js:', error);
+        }
       }
     });
 
-    // Dodaj obsługę kliknięć w powiadomieniach (jeśli nie są już w service workerze)
+    // Dodaj obsługę wiadomości z service workera
     navigator.serviceWorker.addEventListener('message', (event) => {
       if (event.data && event.data.type === 'NOTIFICATION_CLICK') {
-        // Przekieruj do aplikacji
         window.focus();
       }
     });
