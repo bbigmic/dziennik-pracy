@@ -400,7 +400,7 @@ export default function AssignedTasks({
             className="btn-primary flex-1 sm:flex-none flex items-center justify-center gap-1.5 sm:gap-2 text-sm sm:text-base active:scale-[0.98]"
           >
             <Briefcase className="w-4 h-4" />
-            <span className="hidden xs:inline">Dodaj</span> obszar
+            <span>Dodaj</span> obszar
           </button>
           <button
             onClick={() => setFormMode('todo')}
@@ -409,7 +409,7 @@ export default function AssignedTasks({
                        hover:bg-amber-500/30 transition-all active:scale-[0.98]"
           >
             <ListTodo className="w-4 h-4" />
-            <span className="hidden xs:inline">Dodaj</span> zadanie
+            <span>Dodaj</span> zadanie
           </button>
         </div>
       </div>
