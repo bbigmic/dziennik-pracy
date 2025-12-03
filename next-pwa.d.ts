@@ -6,6 +6,7 @@ declare module 'next-pwa' {
     register?: boolean;
     skipWaiting?: boolean;
     disable?: boolean;
+    swSrc?: string; // Ścieżka do własnego service workera
     runtimeCaching?: Array<{
       urlPattern: RegExp | string;
       handler: string;

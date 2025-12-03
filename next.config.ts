@@ -10,16 +10,7 @@ export default withPWA({
   register: true,
   skipWaiting: true,
   disable: process.env.NODE_ENV === "development",
-  runtimeCaching: [
-    {
-      urlPattern: /^https?.*/,
-      handler: "NetworkFirst",
-      options: {
-        cacheName: "offlineCache",
-        expiration: {
-          maxEntries: 200,
-        },
-      },
-    },
-  ],
+  swSrc: "sw-custom.js", // Użyj własnego service workera z obsługą powiadomień push
+  // Uwaga: runtimeCaching nie może być tutaj gdy używamy swSrc
+  // Musi być zdefiniowane bezpośrednio w sw-custom.js
 })(nextConfig);
