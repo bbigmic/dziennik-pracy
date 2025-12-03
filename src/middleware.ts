@@ -25,6 +25,25 @@ export async function middleware(request: NextRequest) {
     return NextResponse.next();
   }
 
+  // Pozwól na endpoint powiadomień push z Vercel Cron
+  if (pathname === '/api/push/notify') {
+    const vercelCronHeader = request.headers.get('x-vercel-cron');
+    if (vercelCronHeader === '1') {
+      return NextResponse.next();
+    }
+    // Jeśli nie ma headeru, sprawdź czy użytkownik jest zalogowany (dla testów)
+    const token = await getToken({
+      req: request,
+      secret: process.env.NEXTAUTH_SECRET,
+    });
+    if (token) {
+      return NextResponse.next();
+    }
+    // Jeśli nie ma tokenu i nie ma headeru, wymagaj autoryzacji
+    return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+  }
+
+  // Pobierz token tylko jeśli nie jest to endpoint push/notify (już sprawdzony wyżej)
   const token = await getToken({
     req: request,
     secret: process.env.NEXTAUTH_SECRET,
