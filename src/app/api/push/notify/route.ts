@@ -206,11 +206,19 @@ export async function POST(req: Request) {
           });
           
           // Jeśli subskrypcja jest nieprawidłowa, usuń ją
-          if (error.statusCode === 410 || error.statusCode === 404) {
-            console.log(`Removing invalid subscription ${subscription.id}`);
-            await prisma.pushSubscription.delete({
-              where: { id: subscription.id },
-            });
+          // 410 = Gone (subskrypcja wygasła)
+          // 404 = Not Found (subskrypcja nie istnieje)
+          // 401 = Unauthorized (nieprawidłowe VAPID keys lub subskrypcja)
+          if (error.statusCode === 410 || error.statusCode === 404 || error.statusCode === 401) {
+            console.log(`Removing invalid subscription ${subscription.id} (status: ${error.statusCode})`);
+            try {
+              await prisma.pushSubscription.delete({
+                where: { id: subscription.id },
+              });
+              console.log(`Subscription ${subscription.id} removed successfully`);
+            } catch (deleteError) {
+              console.error(`Failed to delete subscription ${subscription.id}:`, deleteError);
+            }
           }
           
           errorCount++;
