@@ -12,7 +12,20 @@ if (vapidPublicKey && vapidPrivateKey) {
   webpush.setVapidDetails(vapidSubject, vapidPublicKey, vapidPrivateKey);
 }
 
+// GET - endpoint do testowania (tylko w development)
+export async function GET(req: Request) {
+  if (process.env.NODE_ENV === 'production') {
+    return NextResponse.json({ error: 'Not allowed' }, { status: 403 });
+  }
+  
+  // Wywołaj POST logic
+  return POST(req);
+}
+
 export async function POST(req: Request) {
+  console.log('=== Push notification endpoint called ===');
+  console.log('Timestamp:', new Date().toISOString());
+  
   try {
     // Sprawdź czy to wywołanie z Vercel Cron (header x-vercel-cron)
     // lub z zewnętrznego cron (Authorization header)
@@ -20,11 +33,19 @@ export async function POST(req: Request) {
     const authHeader = req.headers.get('authorization');
     const cronSecret = process.env.CRON_SECRET;
     
+    console.log('Headers:', {
+      'x-vercel-cron': vercelCronHeader,
+      'authorization': authHeader ? 'present' : 'missing',
+    });
+    
     // Vercel automatycznie dodaje header x-vercel-cron do żądań z cron job
     const isVercelCron = vercelCronHeader === '1';
     const isAuthorized = cronSecret && authHeader === `Bearer ${cronSecret}`;
     
+    console.log('Auth check:', { isVercelCron, isAuthorized });
+    
     if (!isVercelCron && !isAuthorized) {
+      console.error('Unauthorized request');
       return NextResponse.json(
         { error: 'Unauthorized' },
         { status: 401 }
@@ -39,10 +60,14 @@ export async function POST(req: Request) {
       });
     }
 
+    console.log('VAPID keys configured');
+
     const today = new Date();
     today.setHours(0, 0, 0, 0);
+    console.log('Today date:', today.toISOString().split('T')[0]);
 
     // Znajdź wszystkie zadania z deadline'em dzisiaj, które nie są ukończone
+    console.log('Fetching tasks with deadlines...');
     const tasksWithDeadlines = await prisma.assignedTask.findMany({
       where: {
         deadline: {
@@ -59,19 +84,31 @@ export async function POST(req: Request) {
       },
     });
 
+    console.log(`Found ${tasksWithDeadlines.length} tasks with deadlines`);
+
     // Filtruj zadania z deadline'em dzisiaj
     const todayTasks = tasksWithDeadlines.filter((task) => {
       if (!task.deadline) return false;
       const deadlineDate = parseISO(task.deadline);
-      return isToday(deadlineDate);
+      const isTodayTask = isToday(deadlineDate);
+      console.log(`Task ${task.id}: deadline=${task.deadline}, isToday=${isTodayTask}`);
+      return isTodayTask;
     });
+
+    console.log(`Found ${todayTasks.length} tasks with deadline today`);
 
     let sentCount = 0;
     let errorCount = 0;
 
     // Wyślij powiadomienia dla każdego użytkownika
     for (const task of todayTasks) {
-      if (task.user.pushSubscriptions.length === 0) continue;
+      console.log(`Processing task ${task.id} for user ${task.userId}`);
+      console.log(`User has ${task.user.pushSubscriptions.length} push subscriptions`);
+      
+      if (task.user.pushSubscriptions.length === 0) {
+        console.log(`Skipping task ${task.id} - user has no push subscriptions`);
+        continue;
+      }
 
       const taskTime = task.deadlineTime 
         ? ` o ${task.deadlineTime}` 
@@ -99,6 +136,7 @@ export async function POST(req: Request) {
       // Wyślij do wszystkich subskrypcji użytkownika
       for (const subscription of task.user.pushSubscriptions) {
         try {
+          console.log(`Sending notification to subscription ${subscription.id}`);
           await webpush.sendNotification(
             {
               endpoint: subscription.endpoint,
@@ -109,12 +147,19 @@ export async function POST(req: Request) {
             },
             JSON.stringify(notification)
           );
+          console.log(`Notification sent successfully to subscription ${subscription.id}`);
           sentCount++;
         } catch (error: any) {
           console.error('Error sending notification:', error);
+          console.error('Error details:', {
+            statusCode: error.statusCode,
+            message: error.message,
+            endpoint: subscription.endpoint.substring(0, 50) + '...',
+          });
           
           // Jeśli subskrypcja jest nieprawidłowa, usuń ją
           if (error.statusCode === 410 || error.statusCode === 404) {
+            console.log(`Removing invalid subscription ${subscription.id}`);
             await prisma.pushSubscription.delete({
               where: { id: subscription.id },
             });
@@ -125,12 +170,16 @@ export async function POST(req: Request) {
       }
     }
 
-    return NextResponse.json({
+    const result = {
       success: true,
       tasksFound: todayTasks.length,
       notificationsSent: sentCount,
       errors: errorCount,
-    });
+    };
+    
+    console.log('=== Push notification result ===', result);
+    
+    return NextResponse.json(result);
   } catch (error) {
     console.error('Notify error:', error);
     return NextResponse.json(
