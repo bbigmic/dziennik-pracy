@@ -1,5 +1,6 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import { useSession } from 'next-auth/react';
+import * as React from 'react';
 
 export function usePushNotifications() {
   const { data: session } = useSession();
@@ -7,6 +8,8 @@ export function usePushNotifications() {
   const [subscription, setSubscription] = useState<PushSubscription | null>(null);
   const [isSubscribed, setIsSubscribed] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
+  const retryCountRef = useRef(0);
+  const maxRetries = 3;
 
   useEffect(() => {
     if (typeof window === 'undefined' || !('serviceWorker' in navigator) || !('PushManager' in window)) {
@@ -21,12 +24,47 @@ export function usePushNotifications() {
 
   const checkSubscription = async () => {
     try {
-      const registration = await navigator.serviceWorker.ready;
+      // Sprawdź czy service worker jest zarejestrowany
+      const registrations = await navigator.serviceWorker.getRegistrations();
+      if (registrations.length === 0) {
+        // Service worker nie jest zarejestrowany - next-pwa może go jeszcze rejestrować
+        // Spróbuj ponownie z limitem prób
+        if (retryCountRef.current < maxRetries) {
+          retryCountRef.current++;
+          setTimeout(() => {
+            checkSubscription();
+          }, 1000);
+          return;
+        } else {
+          // Przekroczono limit prób - service worker prawdopodobnie nie jest dostępny
+          setSubscription(null);
+          setIsSubscribed(false);
+          setIsLoading(false);
+          return;
+        }
+      }
+
+      // Reset licznika prób jeśli service worker jest zarejestrowany
+      retryCountRef.current = 0;
+
+      // Dodaj timeout aby nie czekać w nieskończoność
+      const timeout = new Promise<never>((_, reject) => 
+        setTimeout(() => reject(new Error('Service worker timeout')), 5000)
+      );
+
+      const registration = await Promise.race([
+        navigator.serviceWorker.ready,
+        timeout
+      ]) as ServiceWorkerRegistration;
+
       const sub = await registration.pushManager.getSubscription();
       setSubscription(sub);
       setIsSubscribed(!!sub);
     } catch (error) {
       console.error('Error checking subscription:', error);
+      // Jeśli service worker nie jest dostępny, po prostu ustaw jako nie subskrybowany
+      setSubscription(null);
+      setIsSubscribed(false);
     } finally {
       setIsLoading(false);
     }
