@@ -1,7 +1,7 @@
 'use client';
 
 import { useState } from 'react';
-import { format, isPast, isToday, parseISO, isBefore } from 'date-fns';
+import { format, isPast, isToday, parseISO, isBefore, addDays } from 'date-fns';
 import { pl } from 'date-fns/locale';
 import { AssignedTask } from '@/types';
 import {
@@ -137,6 +137,8 @@ export default function AssignedTasks({
 }: AssignedTasksProps) {
   const [formMode, setFormMode] = useState<FormMode>(null);
   const [editingId, setEditingId] = useState<string | null>(null);
+  const [editingTitleId, setEditingTitleId] = useState<string | null>(null);
+  const [editingTitleValue, setEditingTitleValue] = useState<string>('');
   const [expandedSections, setExpandedSections] = useState({
     responsibilities: true,
     todos: true,
@@ -210,6 +212,54 @@ export default function AssignedTasks({
     setFormData(prev => ({ ...prev, [field]: value }));
   };
 
+  // Funkcje do szybkiej edycji jednym kliknięciem
+  const cyclePriority = (task: AssignedTask) => {
+    const priorities: ('low' | 'medium' | 'high')[] = ['low', 'medium', 'high'];
+    const currentIndex = priorities.indexOf(task.priority);
+    const nextIndex = (currentIndex + 1) % priorities.length;
+    onUpdateTask(task.id, { priority: priorities[nextIndex] });
+  };
+
+  const cycleDeadline = (task: AssignedTask) => {
+    if (task.category !== 'todo') return;
+    
+    const today = format(new Date(), 'yyyy-MM-dd');
+    const tomorrow = format(addDays(new Date(), 1), 'yyyy-MM-dd');
+    const nextWeek = format(addDays(new Date(), 7), 'yyyy-MM-dd');
+    
+    if (!task.deadline) {
+      // Brak terminu -> dziś
+      onUpdateTask(task.id, { deadline: today });
+    } else if (task.deadline === today) {
+      // Dziś -> jutro
+      onUpdateTask(task.id, { deadline: tomorrow });
+    } else if (task.deadline === tomorrow) {
+      // Jutro -> za tydzień
+      onUpdateTask(task.id, { deadline: nextWeek });
+    } else {
+      // Za tydzień lub inna data -> brak terminu
+      onUpdateTask(task.id, { deadline: undefined, deadlineTime: undefined });
+    }
+  };
+
+  const startEditingTitle = (task: AssignedTask) => {
+    setEditingTitleId(task.id);
+    setEditingTitleValue(task.title);
+  };
+
+  const saveTitleEdit = (taskId: string) => {
+    if (editingTitleValue.trim()) {
+      onUpdateTask(taskId, { title: editingTitleValue.trim() });
+    }
+    setEditingTitleId(null);
+    setEditingTitleValue('');
+  };
+
+  const cancelTitleEdit = () => {
+    setEditingTitleId(null);
+    setEditingTitleValue('');
+  };
+
   const renderTaskCard = (task: AssignedTask, isTodo: boolean) => {
     if (editingId === task.id) {
       return (
@@ -269,11 +319,35 @@ export default function AssignedTasks({
         <div className="flex items-start gap-2 sm:gap-3">
           <div className="flex-1 min-w-0">
             <div className="flex flex-wrap items-center gap-1.5 sm:gap-2 mb-1">
-              <h4 className="font-semibold text-sm sm:text-base">
-                {task.title}
-              </h4>
+              {editingTitleId === task.id ? (
+                <input
+                  type="text"
+                  value={editingTitleValue}
+                  onChange={(e) => setEditingTitleValue(e.target.value)}
+                  onBlur={() => saveTitleEdit(task.id)}
+                  onKeyDown={(e) => {
+                    if (e.key === 'Enter') {
+                      saveTitleEdit(task.id);
+                    } else if (e.key === 'Escape') {
+                      cancelTitleEdit();
+                    }
+                  }}
+                  className="flex-1 font-semibold text-sm sm:text-base bg-transparent border-b-2 border-[var(--accent-primary)] focus:outline-none focus:border-[var(--accent-secondary)]"
+                  autoFocus
+                />
+              ) : (
+                <h4 
+                  className="font-semibold text-sm sm:text-base cursor-pointer hover:text-[var(--accent-primary)] transition-colors"
+                  onClick={() => startEditingTitle(task)}
+                  title="Kliknij, aby edytować tytuł"
+                >
+                  {task.title}
+                </h4>
+              )}
               <span
-                className={`text-[10px] sm:text-xs px-1.5 sm:px-2 py-0.5 rounded-full border ${priorityColors[task.priority]}`}
+                onClick={() => cyclePriority(task)}
+                className={`text-[10px] sm:text-xs px-1.5 sm:px-2 py-0.5 rounded-full border cursor-pointer hover:opacity-80 transition-opacity ${priorityColors[task.priority]}`}
+                title="Kliknij, aby zmienić priorytet"
               >
                 {priorityLabels[task.priority]}
               </span>
@@ -283,26 +357,41 @@ export default function AssignedTasks({
                 {task.description}
               </p>
             )}
-            {task.deadline && (
-              <div className={`flex items-center gap-1 mt-2 text-xs sm:text-sm ${
-                deadlineStatus === 'overdue' 
-                  ? 'text-rose-400' 
-                  : deadlineStatus === 'today' 
-                  ? 'text-amber-400' 
-                  : 'text-[var(--text-muted)]'
-              }`}>
-                {deadlineStatus === 'overdue' ? (
-                  <AlertCircle className="w-3.5 h-3.5" />
-                ) : task.deadlineTime ? (
-                  <Clock className="w-3.5 h-3.5" />
+            {isTodo && (
+              <div 
+                onClick={() => cycleDeadline(task)}
+                className={`flex items-center gap-1 mt-2 text-xs sm:text-sm cursor-pointer hover:opacity-80 transition-opacity ${
+                  deadlineStatus === 'overdue' 
+                    ? 'text-rose-400' 
+                    : deadlineStatus === 'today' 
+                    ? 'text-amber-400' 
+                    : task.deadline
+                    ? 'text-[var(--text-muted)]'
+                    : 'text-[var(--text-muted)] opacity-60'
+                }`}
+                title="Kliknij, aby zmienić termin"
+              >
+                {task.deadline ? (
+                  <>
+                    {deadlineStatus === 'overdue' ? (
+                      <AlertCircle className="w-3.5 h-3.5" />
+                    ) : task.deadlineTime ? (
+                      <Clock className="w-3.5 h-3.5" />
+                    ) : (
+                      <Calendar className="w-3.5 h-3.5" />
+                    )}
+                    <span>
+                      {deadlineStatus === 'overdue' && 'Przeterminowane: '}
+                      {deadlineStatus === 'today' && 'Dziś: '}
+                      {formatDeadline(task.deadline, task.deadlineTime)}
+                    </span>
+                  </>
                 ) : (
-                  <Calendar className="w-3.5 h-3.5" />
+                  <>
+                    <Calendar className="w-3.5 h-3.5" />
+                    <span className="italic">Brak terminu (kliknij, aby ustawić)</span>
+                  </>
                 )}
-                <span>
-                  {deadlineStatus === 'overdue' && 'Przeterminowane: '}
-                  {deadlineStatus === 'today' && 'Dziś: '}
-                  {formatDeadline(task.deadline, task.deadlineTime)}
-                </span>
               </div>
             )}
           </div>
@@ -396,13 +485,6 @@ export default function AssignedTasks({
         <h2 className="text-xl sm:text-2xl font-bold">Przypisane zadania</h2>
         <div className="flex gap-2">
           <button
-            onClick={() => setFormMode('responsibility')}
-            className="btn-primary flex-1 sm:flex-none flex items-center justify-center gap-1.5 sm:gap-2 text-sm sm:text-base active:scale-[0.98]"
-          >
-            <Briefcase className="w-4 h-4" />
-            <span>Dodaj</span> obszar
-          </button>
-          <button
             onClick={() => setFormMode('todo')}
             className="flex-1 sm:flex-none flex items-center justify-center gap-1.5 sm:gap-2 px-3 sm:px-4 py-2 sm:py-2.5 rounded-lg sm:rounded-xl font-semibold text-sm sm:text-base
                        bg-amber-500/20 text-amber-400 border border-amber-500/30
@@ -411,54 +493,24 @@ export default function AssignedTasks({
             <ListTodo className="w-4 h-4" />
             <span>Dodaj</span> zadanie
           </button>
+          <button
+            onClick={() => setFormMode('responsibility')}
+            className="btn-primary flex-1 sm:flex-none flex items-center justify-center gap-1.5 sm:gap-2 text-sm sm:text-base active:scale-[0.98]"
+          >
+            <Briefcase className="w-4 h-4" />
+            <span>Dodaj</span> obszar
+          </button>
         </div>
       </div>
 
-      {/* Add form for responsibility */}
-      {formMode === 'responsibility' && renderAddForm('responsibility')}
-      
       {/* Add form for todo */}
       {formMode === 'todo' && renderAddForm('todo')}
 
-      {/* Responsibilities section */}
-      <div className="mb-4 sm:mb-6">
-        <button
-          onClick={() => toggleSection('responsibilities')}
-          className="w-full flex items-center justify-between p-3 sm:p-4 rounded-lg sm:rounded-xl bg-[var(--bg-secondary)] border border-[var(--border-color)] hover:border-[var(--accent-primary)] transition-all mb-2 sm:mb-3 active:scale-[0.99]"
-        >
-          <div className="flex items-center gap-2 sm:gap-3">
-            <div className="p-1.5 sm:p-2 rounded-lg bg-[var(--accent-primary)]/20">
-              <Briefcase className="w-4 h-4 sm:w-5 sm:h-5 text-[var(--accent-secondary)]" />
-            </div>
-            <div className="text-left">
-              <h3 className="font-semibold text-sm sm:text-base">Obszary odpowiedzialności</h3>
-              <p className="text-xs sm:text-sm text-[var(--text-muted)]">
-                {responsibilities.length} {responsibilities.length === 1 ? 'obszar' : 'obszarów'}
-              </p>
-            </div>
-          </div>
-          {expandedSections.responsibilities ? (
-            <ChevronUp className="w-5 h-5 text-[var(--text-muted)]" />
-          ) : (
-            <ChevronDown className="w-5 h-5 text-[var(--text-muted)]" />
-          )}
-        </button>
-
-        {expandedSections.responsibilities && (
-          <div className="space-y-2 sm:space-y-3 pl-2 sm:pl-4">
-            {responsibilities.length === 0 ? (
-              <p className="text-[var(--text-muted)] text-xs sm:text-sm py-3 sm:py-4 text-center">
-                Brak przypisanych obszarów odpowiedzialności
-              </p>
-            ) : (
-              responsibilities.map(task => renderTaskCard(task, false))
-            )}
-          </div>
-        )}
-      </div>
+      {/* Add form for responsibility */}
+      {formMode === 'responsibility' && renderAddForm('responsibility')}
 
       {/* Todos section */}
-      <div>
+      <div className="mb-4 sm:mb-6">
         <button
           onClick={() => toggleSection('todos')}
           className="w-full flex items-center justify-between p-3 sm:p-4 rounded-lg sm:rounded-xl bg-[var(--bg-secondary)] border border-[var(--border-color)] hover:border-[var(--accent-primary)] transition-all mb-2 sm:mb-3 active:scale-[0.99]"
@@ -489,6 +541,43 @@ export default function AssignedTasks({
               </p>
             ) : (
               todos.map(task => renderTaskCard(task, true))
+            )}
+          </div>
+        )}
+      </div>
+
+      {/* Responsibilities section */}
+      <div>
+        <button
+          onClick={() => toggleSection('responsibilities')}
+          className="w-full flex items-center justify-between p-3 sm:p-4 rounded-lg sm:rounded-xl bg-[var(--bg-secondary)] border border-[var(--border-color)] hover:border-[var(--accent-primary)] transition-all mb-2 sm:mb-3 active:scale-[0.99]"
+        >
+          <div className="flex items-center gap-2 sm:gap-3">
+            <div className="p-1.5 sm:p-2 rounded-lg bg-[var(--accent-primary)]/20">
+              <Briefcase className="w-4 h-4 sm:w-5 sm:h-5 text-[var(--accent-secondary)]" />
+            </div>
+            <div className="text-left">
+              <h3 className="font-semibold text-sm sm:text-base">Obszary odpowiedzialności</h3>
+              <p className="text-xs sm:text-sm text-[var(--text-muted)]">
+                {responsibilities.length} {responsibilities.length === 1 ? 'obszar' : 'obszarów'}
+              </p>
+            </div>
+          </div>
+          {expandedSections.responsibilities ? (
+            <ChevronUp className="w-5 h-5 text-[var(--text-muted)]" />
+          ) : (
+            <ChevronDown className="w-5 h-5 text-[var(--text-muted)]" />
+          )}
+        </button>
+
+        {expandedSections.responsibilities && (
+          <div className="space-y-2 sm:space-y-3 pl-2 sm:pl-4">
+            {responsibilities.length === 0 ? (
+              <p className="text-[var(--text-muted)] text-xs sm:text-sm py-3 sm:py-4 text-center">
+                Brak przypisanych obszarów odpowiedzialności
+              </p>
+            ) : (
+              responsibilities.map(task => renderTaskCard(task, false))
             )}
           </div>
         )}
