@@ -9,6 +9,7 @@ import DayModal from '@/components/DayModal';
 import AssignedTasks from '@/components/AssignedTasks';
 import FloatingAssistant from '@/components/FloatingAssistant';
 import UserProfileModal from '@/components/UserProfileModal';
+import TodayTasks from '@/components/TodayTasks';
 import { useTasks } from '@/hooks/useTasks';
 import { useAssignedTasksApi } from '@/hooks/useAssignedTasksApi';
 import Link from 'next/link';
@@ -213,6 +214,9 @@ export default function Home() {
             </span>
           </p>
         </header>
+
+        {/* Today Tasks */}
+        <TodayTasks tasks={assignedTasks} />
 
         {/* Calendar */}
         <Calendar data={data} onDayClick={handleDayClick} />

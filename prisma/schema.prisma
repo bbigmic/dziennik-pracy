@@ -63,16 +63,17 @@ model Task {
 }
 
 model AssignedTask {
-  id           String   @id @default(cuid())
-  title        String
-  description  String?
-  category     String   @default("todo") // 'responsibility' | 'todo'
-  priority     String   @default("medium") // 'low' | 'medium' | 'high'
-  completed    Boolean  @default(false)
-  deadline     String? // format: YYYY-MM-DD
-  deadlineTime String? // format: HH:mm
-  createdAt    DateTime @default(now())
-  updatedAt    DateTime @updatedAt
+  id                String    @id @default(cuid())
+  title             String
+  description       String?
+  category          String    @default("todo") // 'responsibility' | 'todo'
+  priority          String    @default("medium") // 'low' | 'medium' | 'high'
+  completed         Boolean   @default(false)
+  deadline          String? // format: YYYY-MM-DD
+  deadlineTime      String? // format: HH:mm
+  notificationSentAt DateTime? // Data wysłania powiadomienia godzinę przed deadline'em
+  createdAt         DateTime  @default(now())
+  updatedAt         DateTime  @updatedAt
 
   userId String
   user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)

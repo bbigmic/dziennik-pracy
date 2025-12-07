@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
-import { isToday, parseISO } from 'date-fns';
+import { parseISO, differenceInMinutes, isBefore } from 'date-fns';
 import webpush from 'web-push';
 
 // VAPID keys - powinny być w zmiennych środowiskowych
@@ -110,11 +110,10 @@ export async function POST(req: Request) {
 
     console.log('VAPID keys configured');
 
-    const today = new Date();
-    today.setHours(0, 0, 0, 0);
-    console.log('Today date:', today.toISOString().split('T')[0]);
+    const now = new Date();
+    console.log('Current time:', now.toISOString());
 
-    // Znajdź wszystkie zadania z deadline'em dzisiaj, które nie są ukończone
+    // Znajdź wszystkie zadania z deadline'em, które nie są ukończone i nie mają jeszcze wysłanego powiadomienia
     console.log('Fetching tasks with deadlines...');
     const tasksWithDeadlines = await prisma.assignedTask.findMany({
       where: {
@@ -122,6 +121,7 @@ export async function POST(req: Request) {
           not: null,
         },
         completed: false,
+        notificationSentAt: null, // Tylko zadania, dla których jeszcze nie wysłaliśmy powiadomienia
       },
       include: {
         user: {
@@ -132,24 +132,50 @@ export async function POST(req: Request) {
       },
     });
 
-    console.log(`Found ${tasksWithDeadlines.length} tasks with deadlines`);
+    console.log(`Found ${tasksWithDeadlines.length} tasks with deadlines (without notification)`);
 
-    // Filtruj zadania z deadline'em dzisiaj
-    const todayTasks = tasksWithDeadlines.filter((task) => {
+    // Filtruj zadania z deadline'em za godzinę (w przedziale 50-70 minut)
+    // To daje nam okno 20 minut na wysłanie powiadomienia, co wystarczy dla cron job uruchamianego co 15 minut
+    const tasksToNotify = tasksWithDeadlines.filter((task) => {
       if (!task.deadline) return false;
-      const deadlineDate = parseISO(task.deadline);
-      const isTodayTask = isToday(deadlineDate);
-      console.log(`Task ${task.id}: deadline=${task.deadline}, isToday=${isTodayTask}`);
-      return isTodayTask;
+      
+      // Utwórz pełną datę deadline'u
+      let deadlineDate = parseISO(task.deadline);
+      
+      if (task.deadlineTime) {
+        const [hours, minutes] = task.deadlineTime.split(':').map(Number);
+        deadlineDate = new Date(deadlineDate);
+        deadlineDate.setHours(hours, minutes, 0, 0);
+      } else {
+        // Jeśli nie ma czasu, ustaw na koniec dnia (23:59:59)
+        deadlineDate = new Date(deadlineDate);
+        deadlineDate.setHours(23, 59, 59, 999);
+      }
+      
+      // Sprawdź czy deadline jest w przyszłości
+      if (isBefore(deadlineDate, now)) {
+        return false; // Deadline już minął
+      }
+      
+      // Oblicz różnicę w minutach między teraz a deadline'em
+      const minutesUntilDeadline = differenceInMinutes(deadlineDate, now);
+      
+      // Powiadomienie powinno być wysłane godzinę przed deadline'em (60 minut)
+      // Używamy przedziału 50-70 minut, aby dać okno na wysłanie powiadomienia
+      const shouldNotify = minutesUntilDeadline >= 50 && minutesUntilDeadline <= 70;
+      
+      console.log(`Task ${task.id}: deadline=${task.deadline} ${task.deadlineTime || ''}, minutesUntilDeadline=${minutesUntilDeadline}, shouldNotify=${shouldNotify}`);
+      
+      return shouldNotify;
     });
 
-    console.log(`Found ${todayTasks.length} tasks with deadline today`);
+    console.log(`Found ${tasksToNotify.length} tasks to notify (deadline in ~1 hour)`);
 
     let sentCount = 0;
     let errorCount = 0;
 
     // Wyślij powiadomienia dla każdego użytkownika
-    for (const task of todayTasks) {
+    for (const task of tasksToNotify) {
       console.log(`Processing task ${task.id} for user ${task.userId}`);
       console.log(`User has ${task.user.pushSubscriptions.length} push subscriptions`);
       
@@ -158,9 +184,37 @@ export async function POST(req: Request) {
         continue;
       }
 
+      // Oblicz deadline dla wyświetlenia w powiadomieniu
+      // TypeScript guard - wiemy że deadline nie jest null (przefiltrowane wcześniej)
+      if (!task.deadline) continue;
+      
+      let deadlineDate = parseISO(task.deadline);
+      if (task.deadlineTime) {
+        const [hours, minutes] = task.deadlineTime.split(':').map(Number);
+        deadlineDate = new Date(deadlineDate);
+        deadlineDate.setHours(hours, minutes, 0, 0);
+      } else {
+        deadlineDate = new Date(deadlineDate);
+        deadlineDate.setHours(23, 59, 59, 999);
+      }
+      
+      const minutesUntilDeadline = differenceInMinutes(deadlineDate, now);
+      const hoursUntilDeadline = Math.floor(minutesUntilDeadline / 60);
+      const remainingMinutes = minutesUntilDeadline % 60;
+      
+      let timeText = '';
+      if (hoursUntilDeadline > 0) {
+        timeText = ` za ${hoursUntilDeadline} ${hoursUntilDeadline === 1 ? 'godzinę' : 'godziny'}`;
+        if (remainingMinutes > 0) {
+          timeText += ` i ${remainingMinutes} ${remainingMinutes === 1 ? 'minutę' : 'minut'}`;
+        }
+      } else {
+        timeText = ` za ${remainingMinutes} ${remainingMinutes === 1 ? 'minutę' : 'minut'}`;
+      }
+      
       const taskTime = task.deadlineTime 
         ? ` o ${task.deadlineTime}` 
-        : ' dzisiaj';
+        : '';
       
       const priorityEmoji = {
         low: '🟢',
@@ -169,7 +223,7 @@ export async function POST(req: Request) {
       }[task.priority] || '📋';
 
       const notification = {
-        title: `${priorityEmoji} Deadline dzisiaj${taskTime}`,
+        title: `${priorityEmoji} Deadline${timeText}${taskTime}`,
         body: task.title,
         icon: '/icon-192x192.png',
         badge: '/icon-96x96.png',
@@ -182,6 +236,7 @@ export async function POST(req: Request) {
       };
 
       // Wyślij do wszystkich subskrypcji użytkownika
+      let notificationSent = false;
       for (const subscription of task.user.pushSubscriptions) {
         try {
           console.log(`Sending notification to subscription ${subscription.id}`);
@@ -197,6 +252,7 @@ export async function POST(req: Request) {
           );
           console.log(`Notification sent successfully to subscription ${subscription.id}`);
           sentCount++;
+          notificationSent = true;
         } catch (error: any) {
           console.error('Error sending notification:', error);
           console.error('Error details:', {
@@ -224,11 +280,24 @@ export async function POST(req: Request) {
           errorCount++;
         }
       }
+      
+      // Oznacz zadanie jako mające wysłane powiadomienie, jeśli udało się wysłać do przynajmniej jednej subskrypcji
+      if (notificationSent) {
+        try {
+          await prisma.assignedTask.update({
+            where: { id: task.id },
+            data: { notificationSentAt: now },
+          });
+          console.log(`Marked task ${task.id} as notification sent`);
+        } catch (updateError) {
+          console.error(`Failed to update notificationSentAt for task ${task.id}:`, updateError);
+        }
+      }
     }
 
     const result = {
       success: true,
-      tasksFound: todayTasks.length,
+      tasksFound: tasksToNotify.length,
       notificationsSent: sentCount,
       errors: errorCount,
     };
