@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
-import { parseISO, differenceInMinutes, isBefore } from 'date-fns';
+import { parseISO, isToday, isBefore, startOfDay } from 'date-fns';
 import webpush from 'web-push';
 
 // VAPID keys - powinny być w zmiennych środowiskowych
@@ -111,17 +111,25 @@ export async function POST(req: Request) {
     console.log('VAPID keys configured');
 
     const now = new Date();
+    const todayStart = startOfDay(now);
     console.log('Current time:', now.toISOString());
+    console.log('Today start:', todayStart.toISOString());
 
-    // Znajdź wszystkie zadania z deadline'em, które nie są ukończone i nie mają jeszcze wysłanego powiadomienia
-    console.log('Fetching tasks with deadlines...');
+    // Znajdź wszystkie zadania z deadline'em dzisiaj, które nie są ukończone
+    // i nie mają jeszcze wysłanego powiadomienia dzisiaj
+    console.log('Fetching tasks with deadlines today...');
     const tasksWithDeadlines = await prisma.assignedTask.findMany({
       where: {
         deadline: {
           not: null,
         },
         completed: false,
-        notificationSentAt: null, // Tylko zadania, dla których jeszcze nie wysłaliśmy powiadomienia
+        // Sprawdź czy nie wysłaliśmy powiadomienia dzisiaj
+        // notificationSentAt jest null LUB data jest wcześniejsza niż dzisiaj
+        OR: [
+          { notificationSentAt: null },
+          { notificationSentAt: { lt: todayStart } },
+        ],
       },
       include: {
         user: {
@@ -132,44 +140,21 @@ export async function POST(req: Request) {
       },
     });
 
-    console.log(`Found ${tasksWithDeadlines.length} tasks with deadlines (without notification)`);
+    console.log(`Found ${tasksWithDeadlines.length} tasks with deadlines`);
 
-    // Filtruj zadania z deadline'em za godzinę (w przedziale 50-70 minut)
-    // To daje nam okno 20 minut na wysłanie powiadomienia, co wystarczy dla cron job uruchamianego co 15 minut
+    // Filtruj zadania z deadline'em dzisiaj
     const tasksToNotify = tasksWithDeadlines.filter((task) => {
       if (!task.deadline) return false;
       
-      // Utwórz pełną datę deadline'u
-      let deadlineDate = parseISO(task.deadline);
+      const deadlineDate = parseISO(task.deadline);
+      const isTodayTask = isToday(deadlineDate);
       
-      if (task.deadlineTime) {
-        const [hours, minutes] = task.deadlineTime.split(':').map(Number);
-        deadlineDate = new Date(deadlineDate);
-        deadlineDate.setHours(hours, minutes, 0, 0);
-      } else {
-        // Jeśli nie ma czasu, ustaw na koniec dnia (23:59:59)
-        deadlineDate = new Date(deadlineDate);
-        deadlineDate.setHours(23, 59, 59, 999);
-      }
+      console.log(`Task ${task.id}: deadline=${task.deadline}, isToday=${isTodayTask}`);
       
-      // Sprawdź czy deadline jest w przyszłości
-      if (isBefore(deadlineDate, now)) {
-        return false; // Deadline już minął
-      }
-      
-      // Oblicz różnicę w minutach między teraz a deadline'em
-      const minutesUntilDeadline = differenceInMinutes(deadlineDate, now);
-      
-      // Powiadomienie powinno być wysłane godzinę przed deadline'em (60 minut)
-      // Używamy przedziału 50-70 minut, aby dać okno na wysłanie powiadomienia
-      const shouldNotify = minutesUntilDeadline >= 50 && minutesUntilDeadline <= 70;
-      
-      console.log(`Task ${task.id}: deadline=${task.deadline} ${task.deadlineTime || ''}, minutesUntilDeadline=${minutesUntilDeadline}, shouldNotify=${shouldNotify}`);
-      
-      return shouldNotify;
+      return isTodayTask;
     });
 
-    console.log(`Found ${tasksToNotify.length} tasks to notify (deadline in ~1 hour)`);
+    console.log(`Found ${tasksToNotify.length} tasks to notify (deadline today)`);
 
     let sentCount = 0;
     let errorCount = 0;
@@ -184,37 +169,12 @@ export async function POST(req: Request) {
         continue;
       }
 
-      // Oblicz deadline dla wyświetlenia w powiadomieniu
       // TypeScript guard - wiemy że deadline nie jest null (przefiltrowane wcześniej)
       if (!task.deadline) continue;
       
-      let deadlineDate = parseISO(task.deadline);
-      if (task.deadlineTime) {
-        const [hours, minutes] = task.deadlineTime.split(':').map(Number);
-        deadlineDate = new Date(deadlineDate);
-        deadlineDate.setHours(hours, minutes, 0, 0);
-      } else {
-        deadlineDate = new Date(deadlineDate);
-        deadlineDate.setHours(23, 59, 59, 999);
-      }
-      
-      const minutesUntilDeadline = differenceInMinutes(deadlineDate, now);
-      const hoursUntilDeadline = Math.floor(minutesUntilDeadline / 60);
-      const remainingMinutes = minutesUntilDeadline % 60;
-      
-      let timeText = '';
-      if (hoursUntilDeadline > 0) {
-        timeText = ` za ${hoursUntilDeadline} ${hoursUntilDeadline === 1 ? 'godzinę' : 'godziny'}`;
-        if (remainingMinutes > 0) {
-          timeText += ` i ${remainingMinutes} ${remainingMinutes === 1 ? 'minutę' : 'minut'}`;
-        }
-      } else {
-        timeText = ` za ${remainingMinutes} ${remainingMinutes === 1 ? 'minutę' : 'minut'}`;
-      }
-      
       const taskTime = task.deadlineTime 
         ? ` o ${task.deadlineTime}` 
-        : '';
+        : ' dzisiaj';
       
       const priorityEmoji = {
         low: '🟢',
@@ -223,7 +183,7 @@ export async function POST(req: Request) {
       }[task.priority] || '📋';
 
       const notification = {
-        title: `${priorityEmoji} Deadline${timeText}${taskTime}`,
+        title: `${priorityEmoji} Deadline dzisiaj${taskTime}`,
         body: task.title,
         icon: '/icon-192x192.png',
         badge: '/icon-96x96.png',

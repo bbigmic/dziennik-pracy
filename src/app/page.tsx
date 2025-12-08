@@ -216,7 +216,7 @@ export default function Home() {
         </header>
 
         {/* Today Tasks */}
-        <TodayTasks tasks={assignedTasks} />
+        <TodayTasks tasks={assignedTasks} onMarkAsDone={handleMarkAsDone} />
 
         {/* Calendar */}
         <Calendar data={data} onDayClick={handleDayClick} />

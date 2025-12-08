@@ -2,13 +2,14 @@
 
 import { format, isToday, parseISO } from 'date-fns';
 import { AssignedTask } from '@/types';
-import { Clock } from 'lucide-react';
+import { Clock, CheckCircle } from 'lucide-react';
 
 interface TodayTasksProps {
   tasks: AssignedTask[];
+  onMarkAsDone: (taskId: string, taskTitle: string) => void;
 }
 
-export default function TodayTasks({ tasks }: TodayTasksProps) {
+export default function TodayTasks({ tasks, onMarkAsDone }: TodayTasksProps) {
   const today = new Date();
   const todayKey = format(today, 'yyyy-MM-dd');
 
@@ -60,6 +61,13 @@ export default function TodayTasks({ tasks }: TodayTasksProps) {
               >
                 {task.priority === 'high' ? 'Wysoki' : task.priority === 'medium' ? 'Średni' : 'Niski'}
               </span>
+              <button
+                onClick={() => onMarkAsDone(task.id, task.title)}
+                className="p-1.5 sm:p-2 rounded-lg bg-[var(--success)]/20 hover:bg-[var(--success)]/30 transition-colors text-[var(--success)] active:scale-95 flex-shrink-0"
+                title="Oznacz jako wykonane"
+              >
+                <CheckCircle className="w-4 h-4" />
+              </button>
             </div>
           ))}
         </div>
