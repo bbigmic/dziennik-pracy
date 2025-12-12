@@ -3,7 +3,7 @@
 import { useSession } from 'next-auth/react';
 import { useRouter } from 'next/navigation';
 import { useEffect, useState } from 'react';
-import { Crown, Check, Loader2, ArrowLeft, Zap, Clock, Shield } from 'lucide-react';
+import { Crown, Check, Loader2, ArrowLeft, Zap, Clock, Shield, Gift, X } from 'lucide-react';
 import Link from 'next/link';
 
 export default function SubscriptionPage() {
@@ -16,6 +16,10 @@ export default function SubscriptionPage() {
     trialEndsAt: string | null;
     subscriptionEndsAt: string | null;
   } | null>(null);
+  const [activationCode, setActivationCode] = useState('');
+  const [isActivating, setIsActivating] = useState(false);
+  const [activationError, setActivationError] = useState('');
+  const [activationSuccess, setActivationSuccess] = useState(false);
 
   useEffect(() => {
     if (status === 'unauthenticated') {
@@ -72,6 +76,47 @@ export default function SubscriptionPage() {
       console.error('Error opening portal:', error);
     } finally {
       setIsLoading(false);
+    }
+  };
+
+  const handleActivateCode = async () => {
+    if (!activationCode.trim()) {
+      setActivationError('Wpisz kod aktywacyjny');
+      return;
+    }
+
+    setIsActivating(true);
+    setActivationError('');
+    setActivationSuccess(false);
+
+    try {
+      const res = await fetch('/api/activation', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ code: activationCode.trim() }),
+      });
+
+      const data = await res.json();
+
+      if (!res.ok) {
+        setActivationError(data.error || 'Wystąpił błąd podczas aktywacji');
+        return;
+      }
+
+      setActivationSuccess(true);
+      setActivationCode('');
+      // Odśwież informacje o subskrypcji
+      await fetchSubscriptionInfo();
+      
+      // Ukryj komunikat sukcesu po 5 sekundach
+      setTimeout(() => {
+        setActivationSuccess(false);
+      }, 5000);
+    } catch (error) {
+      console.error('Error activating code:', error);
+      setActivationError('Wystąpił błąd podczas aktywacji kodu');
+    } finally {
+      setIsActivating(false);
     }
   };
 
@@ -140,6 +185,72 @@ export default function SubscriptionPage() {
                 <span>Brak aktywnej subskrypcji</span>
               </div>
             )}
+          </div>
+        )}
+
+        {/* Activation Code Section */}
+        {!subscriptionInfo?.subscriptionEndsAt && (
+          <div className="glass rounded-2xl p-6 mb-8 max-w-md mx-auto border border-purple-500/30">
+            <div className="flex items-center gap-3 mb-4">
+              <div className="p-2 rounded-xl bg-purple-500/20">
+                <Gift className="w-5 h-5 text-purple-400" />
+              </div>
+              <div>
+                <h3 className="font-semibold">Masz kod aktywacyjny?</h3>
+                <p className="text-sm text-[var(--text-muted)]">
+                  Aktywuj darmową subskrypcję na miesiąc
+                </p>
+              </div>
+            </div>
+
+            {activationError && (
+              <div className="mb-4 p-3 rounded-xl bg-red-500/10 border border-red-500/30 text-red-400 text-sm flex items-center justify-between">
+                <span>{activationError}</span>
+                <button
+                  onClick={() => setActivationError('')}
+                  className="p-1 hover:bg-red-500/20 rounded transition-colors"
+                >
+                  <X className="w-4 h-4" />
+                </button>
+              </div>
+            )}
+
+            {activationSuccess && (
+              <div className="mb-4 p-3 rounded-xl bg-green-500/10 border border-green-500/30 text-green-400 text-sm flex items-center gap-2">
+                <Check className="w-4 h-4" />
+                <span>Kod aktywacyjny został zastosowany pomyślnie! Subskrypcja aktywna na miesiąc.</span>
+              </div>
+            )}
+
+            <div className="flex gap-2">
+              <input
+                type="text"
+                value={activationCode}
+                onChange={(e) => setActivationCode(e.target.value)}
+                onKeyPress={(e) => {
+                  if (e.key === 'Enter') {
+                    handleActivateCode();
+                  }
+                }}
+                placeholder="Wpisz kod aktywacyjny"
+                className="flex-1 input-field"
+                disabled={isActivating}
+              />
+              <button
+                onClick={handleActivateCode}
+                disabled={isActivating || !activationCode.trim()}
+                className="px-6 py-3 rounded-xl bg-purple-500/20 border border-purple-500/30 text-purple-400 hover:bg-purple-500/30 font-semibold transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
+              >
+                {isActivating ? (
+                  <Loader2 className="w-5 h-5 animate-spin" />
+                ) : (
+                  <>
+                    <Gift className="w-5 h-5" />
+                    Aktywuj
+                  </>
+                )}
+              </button>
+            </div>
           </div>
         )}
 
