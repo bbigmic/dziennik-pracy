@@ -10,6 +10,7 @@ import AssignedTasks from '@/components/AssignedTasks';
 import FloatingAssistant from '@/components/FloatingAssistant';
 import UserProfileModal from '@/components/UserProfileModal';
 import TodayTasks from '@/components/TodayTasks';
+import TrialExpiredModal from '@/components/TrialExpiredModal';
 import { useTasks } from '@/hooks/useTasks';
 import { useAssignedTasksApi } from '@/hooks/useAssignedTasksApi';
 import Link from 'next/link';
@@ -27,6 +28,7 @@ export default function Home() {
   } = useAssignedTasksApi();
   const [selectedDate, setSelectedDate] = useState<Date | null>(null);
   const [showProfileModal, setShowProfileModal] = useState(false);
+  const [showTrialExpiredModal, setShowTrialExpiredModal] = useState(false);
   const [subscriptionStatus, setSubscriptionStatus] = useState<{
     isActive: boolean;
     isTrialing: boolean;
@@ -45,6 +47,10 @@ export default function Home() {
       if (res.ok) {
         const data = await res.json();
         setSubscriptionStatus(data);
+        // Pokaż modal jeśli trial wygasł i użytkownik nie ma aktywnej subskrypcji
+        if (!data.isActive && !data.isTrialing) {
+          setShowTrialExpiredModal(true);
+        }
       }
     } catch (error) {
       console.error('Error fetching subscription:', error);
@@ -271,6 +277,11 @@ export default function Home() {
       {/* User Profile Modal */}
       {showProfileModal && (
         <UserProfileModal onClose={() => setShowProfileModal(false)} />
+      )}
+
+      {/* Trial Expired Modal */}
+      {showTrialExpiredModal && (
+        <TrialExpiredModal onClose={() => setShowTrialExpiredModal(false)} />
       )}
     </main>
   );

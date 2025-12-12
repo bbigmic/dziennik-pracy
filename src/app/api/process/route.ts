@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import OpenAI from 'openai';
+import { getAuthSession, checkSubscription } from '@/lib/auth';
 
 const openai = new OpenAI({
   apiKey: process.env.OPENAI_API_KEY,
@@ -7,6 +8,24 @@ const openai = new OpenAI({
 
 export async function POST(request: NextRequest) {
   try {
+    const session = await getAuthSession();
+
+    if (!session?.user?.id) {
+      return NextResponse.json(
+        { error: 'Musisz być zalogowany' },
+        { status: 401 }
+      );
+    }
+
+    // Sprawdź subskrypcję
+    const subscription = await checkSubscription(session.user.id);
+    if (!subscription.isActive) {
+      return NextResponse.json(
+        { error: 'Twój trial wygasł. Subskrybuj, aby kontynuować.' },
+        { status: 403 }
+      );
+    }
+
     const { text, date } = await request.json();
 
     if (!text) {
