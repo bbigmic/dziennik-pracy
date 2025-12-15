@@ -4,7 +4,7 @@
 
 // UWAGA: next-pwa automatycznie wstrzyknie na początku tego pliku:
 // - importScripts() dla workbox (z właściwymi URL-ami)
-// - self.__WB_MANIFEST z manifestem precache
+// - manifest precache (wstrzyknięty jako const)
 // NIE dodawaj importScripts() ręcznie!
 
 self.skipWaiting();
@@ -13,12 +13,8 @@ self.skipWaiting();
 if (typeof workbox !== 'undefined') {
   workbox.clientsClaim();
   
-  // Precache manifest (next-pwa wstrzyknie self.__WB_MANIFEST)
-  if (typeof self.__WB_MANIFEST !== 'undefined') {
-    workbox.precaching.precacheAndRoute(self.__WB_MANIFEST);
-  } else {
-    console.warn('[SW] self.__WB_MANIFEST is not defined');
-  }
+  // Użyj wstrzykniętego manifestu precache - wymagane przez workbox injectManifest
+  workbox.precaching.precacheAndRoute(self.__WB_MANIFEST);
 } else {
   console.error('[SW] workbox is not defined - next-pwa may not have injected it correctly');
 }

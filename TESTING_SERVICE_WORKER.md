@@ -185,6 +185,17 @@ Jeśli aplikacja jest wdrożona na Vercel:
 
 4. **Sprawdź czy plik został wygenerowany:**
    - W Build Logs powinno być widoczne generowanie plików przez `next-pwa`
+   - Szukaj linii zawierających:
+     - `[PWA]` - logi z next-pwa
+     - `Service worker:` - informacja o wygenerowanym service workerze
+     - `Inject manifest` - informacja o wstrzyknięciu manifestu
+   - Przykładowe logi które powinny się pojawić:
+     ```
+     [PWA] Service worker: /vercel/path0/public/sw.js
+     [PWA]   url: /sw.js
+     [PWA]   scope: /
+     [PWA] Inject manifest in /vercel/path0/sw-custom.js
+     ```
    - Jeśli widzisz błędy, sprawdź konfigurację w `next.config.ts`
 
 **Uwaga:** Jeśli plik `sw.js` nie jest dostępny na produkcji, ale build zakończył się sukcesem:
