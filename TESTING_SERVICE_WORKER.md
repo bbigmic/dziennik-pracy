@@ -399,6 +399,7 @@ Plik `sw.js` jest w `.gitignore` i **nie powinien** być w repozytorium, poniewa
 - Plik `sw.js` jest dostępny (zwraca kod JavaScript)
 - Build na Vercel zakończył się sukcesem
 - Service worker nie może zostać zarejestrowany
+- **W DevTools → Network NIE MA żądania do `sw.js`** (przeglądarka odrzuca plik przed załadowaniem)
 
 **Możliwe przyczyny:**
 1. **Błąd składniowy w wygenerowanym pliku `sw.js`**
@@ -418,8 +419,16 @@ Plik `sw.js` jest w `.gitignore` i **nie powinien** być w repozytorium, poniewa
 
 2. **Sprawdź wygenerowany plik `sw.js`:**
    - Otwórz `https://twoja-domena.com/sw.js` w przeglądarce
-   - Sprawdź czy plik zaczyna się od `importScripts(...)` z workbox
+   - **KRYTYCZNE:** Plik MUSI zaczynać się od `importScripts(...)` z workbox
+   - Jeśli plik NIE zaczyna się od `importScripts`, to znaczy że `next-pwa` nie wstrzyknął poprawnie workbox
    - Sprawdź czy nie ma błędów składniowych (możesz użyć narzędzi deweloperskich)
+   - Sprawdź czy plik zawiera `workbox` (powinien być wstrzyknięty przez next-pwa)
+   
+   **Jeśli plik NIE zaczyna się od `importScripts`:**
+   - To oznacza, że `next-pwa` nie wstrzyknął poprawnie workbox podczas builda
+   - Sprawdź logi builda na Vercel - mogą być błędy lub ostrzeżenia
+   - Może być problem z konfiguracją `swSrc` w `next.config.ts`
+   - Rozważ użycie domyślnego service workera (bez `swSrc`) lub innej metody
 
 3. **Sprawdź typ MIME:**
    - W DevTools → Network → kliknij na `sw.js`

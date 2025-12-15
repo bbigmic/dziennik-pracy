@@ -11,6 +11,50 @@ export default function PushNotificationSetup() {
     // Funkcja do rejestracji service workera
     const registerServiceWorker = async () => {
       try {
+        // Najpierw sprawdź czy plik sw.js jest dostępny
+        console.log('[PushNotificationSetup] Checking if sw.js is available...');
+        try {
+          const swResponse = await fetch('/sw.js', { method: 'HEAD' });
+          console.log('[PushNotificationSetup] sw.js response status:', swResponse.status);
+          console.log('[PushNotificationSetup] sw.js content-type:', swResponse.headers.get('content-type'));
+          
+          if (!swResponse.ok) {
+            console.error('[PushNotificationSetup] ❌ sw.js is not accessible (status:', swResponse.status, ')');
+            return;
+          }
+          
+          // Sprawdź zawartość pliku
+          const swTextResponse = await fetch('/sw.js');
+          const swText = await swTextResponse.text();
+          console.log('[PushNotificationSetup] sw.js length:', swText.length);
+          console.log('[PushNotificationSetup] sw.js first 200 chars:', swText.substring(0, 200));
+          
+          // Sprawdź czy zawiera workbox
+          if (swText.includes('workbox')) {
+            console.log('[PushNotificationSetup] ✅ sw.js contains workbox');
+          } else {
+            console.warn('[PushNotificationSetup] ⚠️ sw.js does NOT contain workbox');
+          }
+          
+          // Sprawdź czy zawiera importScripts
+          if (swText.includes('importScripts')) {
+            console.log('[PushNotificationSetup] ✅ sw.js contains importScripts');
+          } else {
+            console.warn('[PushNotificationSetup] ⚠️ sw.js does NOT contain importScripts');
+          }
+          
+          // Sprawdź czy plik zaczyna się poprawnie
+          if (swText.trim().startsWith('importScripts')) {
+            console.log('[PushNotificationSetup] ✅ sw.js starts with importScripts');
+          } else {
+            console.warn('[PushNotificationSetup] ⚠️ sw.js does NOT start with importScripts');
+            console.warn('[PushNotificationSetup] First 100 chars:', swText.substring(0, 100));
+          }
+        } catch (fetchError: any) {
+          console.error('[PushNotificationSetup] Error fetching sw.js:', fetchError);
+          return;
+        }
+        
         // Sprawdź czy service worker jest już zarejestrowany
         const registrations = await navigator.serviceWorker.getRegistrations();
         
