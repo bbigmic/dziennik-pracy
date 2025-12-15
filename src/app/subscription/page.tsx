@@ -3,7 +3,7 @@
 import { useSession } from 'next-auth/react';
 import { useRouter } from 'next/navigation';
 import { useEffect, useState } from 'react';
-import { Crown, Check, Loader2, ArrowLeft, Zap, Clock, Shield, Gift, X } from 'lucide-react';
+import { Crown, Check, Loader2, ArrowLeft, Zap, Clock, Shield, Gift, X, XCircle } from 'lucide-react';
 import Link from 'next/link';
 
 export default function SubscriptionPage() {
@@ -20,6 +20,9 @@ export default function SubscriptionPage() {
   const [isActivating, setIsActivating] = useState(false);
   const [activationError, setActivationError] = useState('');
   const [activationSuccess, setActivationSuccess] = useState(false);
+  const [isCanceling, setIsCanceling] = useState(false);
+  const [cancelError, setCancelError] = useState('');
+  const [cancelSuccess, setCancelSuccess] = useState(false);
 
   useEffect(() => {
     if (status === 'unauthenticated') {
@@ -76,6 +79,43 @@ export default function SubscriptionPage() {
       console.error('Error opening portal:', error);
     } finally {
       setIsLoading(false);
+    }
+  };
+
+  const handleCancelSubscription = async () => {
+    if (!confirm('Czy na pewno chcesz anulować subskrypcję? Subskrypcja będzie aktywna do końca okresu rozliczeniowego.')) {
+      return;
+    }
+
+    setIsCanceling(true);
+    setCancelError('');
+    setCancelSuccess(false);
+
+    try {
+      const res = await fetch('/api/stripe/cancel', {
+        method: 'POST',
+      });
+
+      const data = await res.json();
+
+      if (!res.ok) {
+        setCancelError(data.error || 'Wystąpił błąd podczas anulowania subskrypcji');
+        return;
+      }
+
+      setCancelSuccess(true);
+      // Odśwież informacje o subskrypcji
+      await fetchSubscriptionInfo();
+      
+      // Ukryj komunikat sukcesu po 5 sekundach
+      setTimeout(() => {
+        setCancelSuccess(false);
+      }, 5000);
+    } catch (error) {
+      console.error('Error canceling subscription:', error);
+      setCancelError('Wystąpił błąd podczas anulowania subskrypcji');
+    } finally {
+      setIsCanceling(false);
     }
   };
 
@@ -292,17 +332,53 @@ export default function SubscriptionPage() {
           </ul>
 
           {subscriptionInfo?.subscriptionEndsAt ? (
-            <button
-              onClick={handleManageSubscription}
-              disabled={isLoading}
-              className="w-full py-3 px-6 rounded-xl bg-[var(--bg-tertiary)] border border-[var(--border-color)] hover:border-[var(--accent-primary)] font-semibold transition-all flex items-center justify-center gap-2"
-            >
-              {isLoading ? (
-                <Loader2 className="w-5 h-5 animate-spin" />
-              ) : (
-                'Zarządzaj subskrypcją'
+            <div className="space-y-3">
+              {cancelError && (
+                <div className="p-3 rounded-xl bg-red-500/10 border border-red-500/30 text-red-400 text-sm flex items-center justify-between">
+                  <span>{cancelError}</span>
+                  <button
+                    onClick={() => setCancelError('')}
+                    className="p-1 hover:bg-red-500/20 rounded transition-colors"
+                  >
+                    <X className="w-4 h-4" />
+                  </button>
+                </div>
               )}
-            </button>
+
+              {cancelSuccess && (
+                <div className="p-3 rounded-xl bg-amber-500/10 border border-amber-500/30 text-amber-400 text-sm flex items-center gap-2">
+                  <Check className="w-4 h-4" />
+                  <span>Subskrypcja zostanie anulowana na koniec okresu rozliczeniowego. Będziesz miał dostęp do wszystkich funkcji do {subscriptionInfo.subscriptionEndsAt ? formatDate(subscriptionInfo.subscriptionEndsAt) : 'końca okresu'}.</span>
+                </div>
+              )}
+
+              <button
+                onClick={handleManageSubscription}
+                disabled={isLoading}
+                className="w-full py-3 px-6 rounded-xl bg-[var(--bg-tertiary)] border border-[var(--border-color)] hover:border-[var(--accent-primary)] font-semibold transition-all flex items-center justify-center gap-2"
+              >
+                {isLoading ? (
+                  <Loader2 className="w-5 h-5 animate-spin" />
+                ) : (
+                  'Zarządzaj subskrypcją'
+                )}
+              </button>
+
+              <button
+                onClick={handleCancelSubscription}
+                disabled={isCanceling}
+                className="w-full py-3 px-6 rounded-xl bg-red-500/10 border border-red-500/30 hover:bg-red-500/20 text-red-400 font-semibold transition-all flex items-center justify-center gap-2"
+              >
+                {isCanceling ? (
+                  <Loader2 className="w-5 h-5 animate-spin" />
+                ) : (
+                  <>
+                    <XCircle className="w-5 h-5" />
+                    Anuluj subskrypcję
+                  </>
+                )}
+              </button>
+            </div>
           ) : (
             <button
               onClick={handleSubscribe}

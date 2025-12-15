@@ -90,13 +90,27 @@ export async function POST(req: Request) {
       case 'customer.subscription.updated': {
         const subscription = event.data.object as Stripe.Subscription;
 
-        await prisma.user.update({
-          where: { stripeSubscriptionId: subscription.id },
-          data: {
-            stripePriceId: subscription.items.data[0].price.id,
-            stripeCurrentPeriodEnd: new Date((subscription as any).current_period_end * 1000),
-          },
-        });
+        // Jeśli subskrypcja jest anulowana (cancel_at_period_end), zachowaj datę końca okresu
+        // Jeśli subskrypcja jest całkowicie anulowana (status: canceled), wyczyść dane
+        if (subscription.status === 'canceled') {
+          await prisma.user.update({
+            where: { stripeSubscriptionId: subscription.id },
+            data: {
+              stripeSubscriptionId: null,
+              stripePriceId: null,
+              stripeCurrentPeriodEnd: null,
+            },
+          });
+        } else {
+          // Subskrypcja jest aktywna lub anulowana na koniec okresu (cancel_at_period_end)
+          await prisma.user.update({
+            where: { stripeSubscriptionId: subscription.id },
+            data: {
+              stripePriceId: subscription.items.data[0].price.id,
+              stripeCurrentPeriodEnd: new Date((subscription as any).current_period_end * 1000),
+            },
+          });
+        }
         break;
       }
     }
