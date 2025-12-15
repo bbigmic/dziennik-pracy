@@ -1,18 +1,27 @@
 // Custom service worker dla powiadomień push
 // Ten plik będzie używany jako źródło dla next-pwa (swSrc)
-// next-pwa automatycznie doda workbox i precache podczas builda
+// next-pwa automatycznie doda workbox i precache podczas builda używając injectManifest
 
-// next-pwa automatycznie doda na początku:
-// - importScripts() dla workbox
+// UWAGA: next-pwa automatycznie wstrzyknie na początku tego pliku:
+// - importScripts() dla workbox (z właściwymi URL-ami)
 // - self.__WB_MANIFEST z manifestem precache
+// NIE dodawaj importScripts() ręcznie!
 
-// Precache and route - wymagane dla injectManifest
-importScripts();
 self.skipWaiting();
-workbox.clientsClaim();
 
-// Precache manifest (next-pwa wstrzyknie self.__WB_MANIFEST)
-workbox.precaching.precacheAndRoute(self.__WB_MANIFEST);
+// Poczekaj aż workbox będzie dostępny (next-pwa wstrzyknie go na początku)
+if (typeof workbox !== 'undefined') {
+  workbox.clientsClaim();
+  
+  // Precache manifest (next-pwa wstrzyknie self.__WB_MANIFEST)
+  if (typeof self.__WB_MANIFEST !== 'undefined') {
+    workbox.precaching.precacheAndRoute(self.__WB_MANIFEST);
+  } else {
+    console.warn('[SW] self.__WB_MANIFEST is not defined');
+  }
+} else {
+  console.error('[SW] workbox is not defined - next-pwa may not have injected it correctly');
+}
 
 // Obsługa powiadomień push
 self.addEventListener('push', function(event) {

@@ -392,6 +392,48 @@ Plik `sw.js` jest w `.gitignore` i **nie powinien** być w repozytorium, poniewa
 - Sprawdź czy konfiguracja w `next.config.ts` jest poprawna
 - Sprawdź logi builda na Vercel pod kątem błędów
 
+### Problem: "ServiceWorker script evaluation failed"
+
+**Objawy:**
+- Błąd w konsoli: `TypeError: Failed to register a ServiceWorker... ServiceWorker script evaluation failed`
+- Plik `sw.js` jest dostępny (zwraca kod JavaScript)
+- Build na Vercel zakończył się sukcesem
+- Service worker nie może zostać zarejestrowany
+
+**Możliwe przyczyny:**
+1. **Błąd składniowy w wygenerowanym pliku `sw.js`**
+2. **Nieprawidłowy typ MIME** - plik powinien być serwowany jako `application/javascript`
+3. **Problem z workbox** - next-pwa nie wstrzyknął poprawnie workbox do pliku
+4. **Problem z `importScripts()`** - brakujące lub nieprawidłowe importy
+
+**Rozwiązanie:**
+
+1. **Sprawdź logi diagnostyczne w konsoli:**
+   - Po wdrożeniu zaktualizowanego kodu, sprawdź konsolę przeglądarki
+   - Powinny pojawić się szczegółowe logi o pliku `sw.js`:
+     - Czy zawiera `workbox`
+     - Czy zawiera `importScripts`
+     - Jaki jest typ MIME
+     - Długość pliku
+
+2. **Sprawdź wygenerowany plik `sw.js`:**
+   - Otwórz `https://twoja-domena.com/sw.js` w przeglądarce
+   - Sprawdź czy plik zaczyna się od `importScripts(...)` z workbox
+   - Sprawdź czy nie ma błędów składniowych (możesz użyć narzędzi deweloperskich)
+
+3. **Sprawdź typ MIME:**
+   - W DevTools → Network → kliknij na `sw.js`
+   - Sprawdź nagłówek `Content-Type` - powinien być `application/javascript` lub `text/javascript`
+
+4. **Jeśli problem nadal występuje:**
+   - Sprawdź czy `sw-custom.js` nie ma błędów składniowych
+   - Sprawdź czy `next-pwa` jest w najnowszej wersji
+   - Sprawdź logi builda na Vercel pod kątem ostrzeżeń o workbox
+
+5. **Tymczasowe rozwiązanie (jeśli nic nie pomaga):**
+   - Możesz spróbować użyć domyślnego service workera z `next-pwa` (bez `swSrc`)
+   - Albo użyć innej biblioteki do PWA (np. `workbox-webpack-plugin` bezpośrednio)
+
 ### Problem: Powiadomienia push nie działają
 
 **Możliwe przyczyny:**
