@@ -8,6 +8,8 @@ Ten dokument opisuje jak sprawdzić czy service worker działa poprawnie zarówn
 - Service worker wymaga **HTTPS** (poza localhost)
 - Service worker jest automatycznie rejestrowany przez `next-pwa` podczas builda
 - Plik service workera jest generowany jako `/sw.js` w folderze `public/`
+- **Plik `sw.js` jest w `.gitignore` i NIE powinien być w repozytorium** - jest generowany automatycznie podczas builda przez `next-pwa`
+- Na Vercel plik jest generowany automatycznie podczas deploymentu (Vercel uruchamia `npm run build`)
 
 ## 🧪 Testowanie lokalnie
 
@@ -164,6 +166,32 @@ navigator.serviceWorker.ready.then(reg => {
 });
 ```
 
+#### 2.4 Sprawdź logi builda na Vercel (jeśli używasz Vercel)
+
+Jeśli aplikacja jest wdrożona na Vercel:
+
+1. **Przejdź do Vercel Dashboard:**
+   - Otwórz [vercel.com](https://vercel.com)
+   - Wybierz swój projekt
+
+2. **Sprawdź najnowszy deployment:**
+   - Kliknij na najnowszy deployment
+   - Otwórz zakładkę **"Build Logs"**
+
+3. **Sprawdź czy build zakończył się sukcesem:**
+   - Powinien być proces `npm run build`
+   - Powinien zakończyć się statusem "Build Completed"
+   - Sprawdź czy nie ma błędów związanych z `next-pwa` lub `sw.js`
+
+4. **Sprawdź czy plik został wygenerowany:**
+   - W Build Logs powinno być widoczne generowanie plików przez `next-pwa`
+   - Jeśli widzisz błędy, sprawdź konfigurację w `next.config.ts`
+
+**Uwaga:** Jeśli plik `sw.js` nie jest dostępny na produkcji, ale build zakończył się sukcesem:
+- Sprawdź czy `next-pwa` jest w `devDependencies` (powinien być)
+- Sprawdź czy `NODE_ENV=production` jest ustawione na Vercel (jest ustawiane automatycznie)
+- Sprawdź czy konfiguracja w `next.config.ts` jest poprawna
+
 ### Krok 3: Testowanie powiadomień push
 
 #### 3.1 Sprawdź subskrypcję push
@@ -290,12 +318,79 @@ Skrypt automatycznie sprawdzi:
 - Aplikacja nie działa na HTTPS
 - Plik `sw.js` nie jest dostępny (404)
 - Błąd w kodzie service workera
+- Plik `sw.js` nie został wygenerowany podczas builda na Vercel
+- Service worker nie jest automatycznie rejestrowany przez `next-pwa`
 
 **Rozwiązanie:**
 1. Sprawdź czy aplikacja działa na HTTPS
-2. Sprawdź dostępność `https://twoja-domena.com/sw.js`
+2. Sprawdź dostępność `https://twoja-domena.com/sw.js` (powinien zwrócić kod JavaScript, nie 404)
 3. Sprawdź logi w konsoli przeglądarki
-4. Sprawdź logi serwera (Vercel/Netlify/etc.)
+4. Sprawdź logi builda na Vercel:
+   - Przejdź do Vercel Dashboard → Twój projekt → Deployments
+   - Otwórz najnowszy deployment → Build Logs
+   - Sprawdź czy build zakończył się sukcesem
+   - Sprawdź czy nie ma błędów związanych z `next-pwa` lub `sw.js`
+
+### Problem: Plik sw.js jest dostępny, ale service worker nie jest rejestrowany
+
+**Objawy:**
+- ✅ Plik `https://twoja-domena.com/sw.js` jest dostępny (zwraca kod JavaScript)
+- ✅ Build na Vercel zakończył się sukcesem
+- ❌ W DevTools → Network nie widzisz żądania do `sw.js`
+- ❌ W DevTools → Application → Service Workers nie ma zarejestrowanego service workera
+
+**Przyczyna:**
+`next-pwa` z `register: true` powinien automatycznie dodać kod rejestracji do HTML, ale czasami tego nie robi poprawnie (szczególnie gdy używamy `swSrc`).
+
+**Rozwiązanie:**
+Komponent `PushNotificationSetup` został zaktualizowany i automatycznie rejestruje service workera jako fallback. Jeśli problem nadal występuje:
+
+1. **Sprawdź konsolę przeglądarki:**
+   - Powinieneś zobaczyć logi: `[PushNotificationSetup] Service worker not registered, registering...`
+   - Następnie: `[PushNotificationSetup] Service worker registered`
+
+2. **Sprawdź w DevTools:**
+   - Application → Service Workers
+   - Powinien być widoczny zarejestrowany service worker z URL `/sw.js`
+
+3. **Jeśli nadal nie działa, sprawdź:**
+   - Czy nie ma błędów w konsoli
+   - Czy aplikacja działa na HTTPS (wymagane dla service workera)
+   - Czy `PushNotificationSetup` jest załadowany (sprawdź w komponencie `layout.tsx`)
+
+### Problem: Plik sw.js nie ma na GitHubie
+
+**To jest poprawne zachowanie!** ✅
+
+Plik `sw.js` jest w `.gitignore` i **nie powinien** być w repozytorium, ponieważ:
+- Jest generowany automatycznie przez `next-pwa` podczas builda
+- Zawiera dynamiczne hashe i manifesty które zmieniają się przy każdym buildzie
+- Vercel automatycznie uruchamia `npm run build` podczas deploymentu, więc plik będzie wygenerowany
+
+**Jak sprawdzić czy Vercel generuje plik poprawnie:**
+
+1. **Sprawdź logi builda na Vercel:**
+   - Vercel Dashboard → Projekt → Deployments → Otwórz najnowszy deployment
+   - Sprawdź Build Logs - powinien być proces `next build`
+   - Sprawdź czy nie ma błędów
+
+2. **Sprawdź dostępność pliku na produkcji:**
+   ```bash
+   # W przeglądarce lub curl:
+   curl https://twoja-domena.com/sw.js
+   ```
+   Powinien zwrócić kod JavaScript (nie 404).
+
+3. **Sprawdź w DevTools:**
+   - Otwórz aplikację na produkcji
+   - DevTools → Network → Odśwież stronę
+   - Wyszukaj `sw.js` - powinien mieć status 200 OK
+
+**Jeśli plik nie jest dostępny na produkcji:**
+- Sprawdź czy build na Vercel zakończył się sukcesem
+- Sprawdź czy `next-pwa` jest w `devDependencies` (jest)
+- Sprawdź czy konfiguracja w `next.config.ts` jest poprawna
+- Sprawdź logi builda na Vercel pod kątem błędów
 
 ### Problem: Powiadomienia push nie działają
 
