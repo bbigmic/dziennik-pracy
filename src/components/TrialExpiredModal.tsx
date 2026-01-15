@@ -18,15 +18,26 @@ export default function TrialExpiredModal({ onClose }: TrialExpiredModalProps) {
       const res = await fetch('/api/stripe/checkout', {
         method: 'POST',
       });
+      
+      if (!res.ok) {
+        const errorData = await res.json();
+        console.error('Błąd API:', errorData.error || 'Nieznany błąd');
+        alert(errorData.error || 'Wystąpił błąd podczas tworzenia sesji płatności. Spróbuj ponownie.');
+        setIsLoading(false);
+        return;
+      }
+      
       const data = await res.json();
       if (data.url) {
         window.location.href = data.url;
       } else {
-        console.error('Brak URL checkout');
+        console.error('Brak URL checkout w odpowiedzi:', data);
+        alert('Nie udało się utworzyć sesji płatności. Spróbuj ponownie lub przejdź do strony subskrypcji.');
         setIsLoading(false);
       }
     } catch (error) {
       console.error('Error creating checkout:', error);
+      alert('Wystąpił błąd podczas tworzenia sesji płatności. Sprawdź połączenie z internetem i spróbuj ponownie.');
       setIsLoading(false);
     }
   };

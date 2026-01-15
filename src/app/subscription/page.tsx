@@ -54,13 +54,26 @@ export default function SubscriptionPage() {
       const res = await fetch('/api/stripe/checkout', {
         method: 'POST',
       });
+      
+      if (!res.ok) {
+        const errorData = await res.json();
+        console.error('Błąd API:', errorData.error || 'Nieznany błąd');
+        alert(errorData.error || 'Wystąpił błąd podczas tworzenia sesji płatności. Spróbuj ponownie.');
+        setIsLoading(false);
+        return;
+      }
+      
       const data = await res.json();
       if (data.url) {
         window.location.href = data.url;
+      } else {
+        console.error('Brak URL checkout w odpowiedzi:', data);
+        alert('Nie udało się utworzyć sesji płatności. Spróbuj ponownie.');
+        setIsLoading(false);
       }
     } catch (error) {
       console.error('Error creating checkout:', error);
-    } finally {
+      alert('Wystąpił błąd podczas tworzenia sesji płatności. Sprawdź połączenie z internetem i spróbuj ponownie.');
       setIsLoading(false);
     }
   };
@@ -176,6 +189,16 @@ export default function SubscriptionPage() {
     });
   };
 
+  // Sprawdź czy subskrypcja faktycznie wygasła
+  const isSubscriptionExpired = subscriptionInfo?.subscriptionEndsAt
+    ? new Date(subscriptionInfo.subscriptionEndsAt) <= new Date()
+    : true;
+
+  // Sprawdź czy subskrypcja jest aktywna (nie wygasła)
+  const hasActiveSubscription = subscriptionInfo?.subscriptionEndsAt
+    ? new Date(subscriptionInfo.subscriptionEndsAt) > new Date()
+    : false;
+
   return (
     <main className="min-h-screen bg-pattern py-12 px-4">
       <div className="max-w-4xl mx-auto">
@@ -211,11 +234,19 @@ export default function SubscriptionPage() {
                   <strong>{formatDate(subscriptionInfo.trialEndsAt!)}</strong>
                 </span>
               </div>
-            ) : subscriptionInfo.subscriptionEndsAt ? (
+            ) : hasActiveSubscription ? (
               <div className="flex items-center gap-3 text-green-400">
                 <Shield className="w-5 h-5" />
                 <span>
                   Subskrypcja aktywna do{' '}
+                  <strong>{formatDate(subscriptionInfo.subscriptionEndsAt!)}</strong>
+                </span>
+              </div>
+            ) : subscriptionInfo.subscriptionEndsAt ? (
+              <div className="flex items-center gap-3 text-red-400">
+                <XCircle className="w-5 h-5" />
+                <span>
+                  Subskrypcja wygasła{' '}
                   <strong>{formatDate(subscriptionInfo.subscriptionEndsAt)}</strong>
                 </span>
               </div>
@@ -228,8 +259,8 @@ export default function SubscriptionPage() {
           </div>
         )}
 
-        {/* Activation Code Section */}
-        {!subscriptionInfo?.subscriptionEndsAt && (
+        {/* Activation Code Section - pokazuj gdy nie ma aktywnej subskrypcji lub gdy wygasła */}
+        {(!hasActiveSubscription || isSubscriptionExpired) && (
           <div className="glass rounded-2xl p-6 mb-8 max-w-md mx-auto border border-purple-500/30">
             <div className="flex items-center gap-3 mb-4">
               <div className="p-2 rounded-xl bg-purple-500/20">
@@ -331,7 +362,7 @@ export default function SubscriptionPage() {
             </li>
           </ul>
 
-          {subscriptionInfo?.subscriptionEndsAt ? (
+          {hasActiveSubscription ? (
             <div className="space-y-3">
               {cancelError && (
                 <div className="p-3 rounded-xl bg-red-500/10 border border-red-500/30 text-red-400 text-sm flex items-center justify-between">
@@ -348,7 +379,7 @@ export default function SubscriptionPage() {
               {cancelSuccess && (
                 <div className="p-3 rounded-xl bg-amber-500/10 border border-amber-500/30 text-amber-400 text-sm flex items-center gap-2">
                   <Check className="w-4 h-4" />
-                  <span>Subskrypcja zostanie anulowana na koniec okresu rozliczeniowego. Będziesz miał dostęp do wszystkich funkcji do {subscriptionInfo.subscriptionEndsAt ? formatDate(subscriptionInfo.subscriptionEndsAt) : 'końca okresu'}.</span>
+                  <span>Subskrypcja zostanie anulowana na koniec okresu rozliczeniowego. Będziesz miał dostęp do wszystkich funkcji do {subscriptionInfo?.subscriptionEndsAt ? formatDate(subscriptionInfo.subscriptionEndsAt) : 'końca okresu'}.</span>
                 </div>
               )}
 
@@ -380,20 +411,24 @@ export default function SubscriptionPage() {
               </button>
             </div>
           ) : (
-            <button
-              onClick={handleSubscribe}
-              disabled={isLoading}
-              className="btn-primary w-full flex items-center justify-center gap-2"
-            >
-              {isLoading ? (
-                <Loader2 className="w-5 h-5 animate-spin" />
-              ) : (
-                <>
-                  <Crown className="w-5 h-5" />
-                  Subskrybuj teraz
-                </>
-              )}
-            </button>
+            <div className="space-y-3">
+              <button
+                onClick={handleSubscribe}
+                disabled={isLoading}
+                className="btn-primary w-full flex items-center justify-center gap-2"
+              >
+                {isLoading ? (
+                  <Loader2 className="w-5 h-5 animate-spin" />
+                ) : (
+                  <>
+                    <Crown className="w-5 h-5" />
+                    {isSubscriptionExpired && subscriptionInfo?.subscriptionEndsAt
+                      ? 'Odnow subskrypcję'
+                      : 'Subskrybuj teraz'}
+                  </>
+                )}
+              </button>
+            </div>
           )}
         </div>
       </div>

@@ -43,6 +43,15 @@ export async function POST() {
       });
     }
 
+    // Sprawdź czy PRICE_ID jest ustawiony
+    if (!PRICE_ID) {
+      console.error('STRIPE_PRICE_ID nie jest ustawiony w zmiennych środowiskowych');
+      return NextResponse.json(
+        { error: 'Konfiguracja płatności nie jest poprawnie skonfigurowana' },
+        { status: 500 }
+      );
+    }
+
     // Utwórz sesję checkout
     const checkoutSession = await stripe.checkout.sessions.create({
       customer: customerId,
@@ -60,6 +69,14 @@ export async function POST() {
         userId: user.id,
       },
     });
+
+    if (!checkoutSession.url) {
+      console.error('Stripe nie zwrócił URL dla sesji checkout:', checkoutSession.id);
+      return NextResponse.json(
+        { error: 'Nie udało się utworzyć sesji płatności. Spróbuj ponownie.' },
+        { status: 500 }
+      );
+    }
 
     return NextResponse.json({ url: checkoutSession.url });
   } catch (error) {
