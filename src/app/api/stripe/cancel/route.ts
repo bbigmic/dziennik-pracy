@@ -27,12 +27,33 @@ export async function POST() {
     }
 
     // Anuluj subskrypcję w Stripe (anulowanie na koniec okresu - cancel_at_period_end)
-    const canceledSubscription = await stripe.subscriptions.update(
-      user.stripeSubscriptionId,
-      {
-        cancel_at_period_end: true,
+    let canceledSubscription: Stripe.Subscription;
+    try {
+      canceledSubscription = await stripe.subscriptions.update(
+        user.stripeSubscriptionId,
+        {
+          cancel_at_period_end: true,
+        }
+      );
+    } catch (error: any) {
+      if (error?.code === 'resource_missing') {
+        // Subskrypcja jest z innego trybu (testowy vs live)
+        // Wyczyść dane subskrypcji z bazy danych
+        await prisma.user.update({
+          where: { id: user.id },
+          data: {
+            stripeSubscriptionId: null,
+            stripePriceId: null,
+            stripeCurrentPeriodEnd: null,
+          },
+        });
+        return NextResponse.json(
+          { error: 'Subskrypcja nie jest dostępna w aktualnym trybie' },
+          { status: 404 }
+        );
       }
-    );
+      throw error;
+    }
 
     // Aktualizuj datę końca okresu w bazie
     await prisma.user.update({

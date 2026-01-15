@@ -25,6 +25,25 @@ export async function POST() {
       );
     }
 
+    // Sprawdź czy customer istnieje w aktualnym trybie
+    try {
+      await stripe.customers.retrieve(user.stripeCustomerId);
+    } catch (error: any) {
+      if (error?.code === 'resource_missing') {
+        // Customer jest z innego trybu (testowy vs live)
+        // Wyczyść customer ID z bazy danych
+        await prisma.user.update({
+          where: { id: user.id },
+          data: { stripeCustomerId: null },
+        });
+        return NextResponse.json(
+          { error: 'Konto Stripe nie jest dostępne. Wykup subskrypcję ponownie.' },
+          { status: 404 }
+        );
+      }
+      throw error;
+    }
+
     const portalSession = await stripe.billingPortal.sessions.create({
       customer: user.stripeCustomerId,
       return_url: `${process.env.NEXT_PUBLIC_APP_URL}/`,

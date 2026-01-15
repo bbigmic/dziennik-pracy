@@ -21,8 +21,10 @@ export default function TrialExpiredModal({ onClose }: TrialExpiredModalProps) {
       
       if (!res.ok) {
         const errorData = await res.json();
-        console.error('Błąd API:', errorData.error || 'Nieznany błąd');
-        alert(errorData.error || 'Wystąpił błąd podczas tworzenia sesji płatności. Spróbuj ponownie.');
+        const errorMessage = errorData.error || 'Nieznany błąd';
+        const errorDetails = errorData.details ? `\n\nSzczegóły: ${errorData.details}` : '';
+        console.error('Błąd API:', errorMessage, errorData);
+        alert(`${errorMessage}${errorDetails}`);
         setIsLoading(false);
         return;
       }
